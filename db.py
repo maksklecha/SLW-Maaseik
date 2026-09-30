@@ -1,7 +1,8 @@
-"""SQLite database: the (fake) KBC data + everything the Context Engine learns.
+"""SQLite database access. The database itself is defined in database/schema.sql and
+filled with 3 fake customers from database/seed.sql.
 
-SQLite = a full SQL database in ONE file (kbc.db). It is built into Python,
-so there is nothing to install. The same SQL would work on PostgreSQL at KBC.
+SQLite = a full SQL database in ONE file (kbc.db), built into Python - nothing to install.
+Open kbc.db with a free viewer (e.g. "DB Browser for SQLite") to look inside.
 
 Security rule used everywhere below: values are passed with "?" placeholders,
 NEVER pasted into the SQL string with f-strings (that would allow SQL injection).
@@ -11,42 +12,12 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
-DB_PATH = Path(__file__).parent / "kbc.db"
-SEED_FILE = Path(__file__).parent / "data" / "seed.json"
+ROOT = Path(__file__).parent
+DB_PATH = ROOT / "kbc.db"
+SCHEMA_FILE = ROOT / "database" / "schema.sql"
+SEED_FILE = ROOT / "database" / "seed.sql"
 
-SCHEMA = """
-CREATE TABLE customers (
-    id TEXT PRIMARY KEY, name TEXT, age INTEGER, gender TEXT, occupation TEXT, city TEXT,
-    language TEXT, children INTEGER, preferred_channel TEXT,
-    active_hour_start INTEGER, active_hour_end INTEGER
-);
-CREATE TABLE merchants (name TEXT PRIMARY KEY, description TEXT);
-CREATE TABLE transactions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT REFERENCES customers(id),
-    date TEXT, merchant TEXT REFERENCES merchants(name), amount_eur REAL,
-    batch INTEGER, released INTEGER DEFAULT 0      -- released = the bank has "received" it
-);
--- Classification cache: each company is classified ONCE, not once per customer
-CREATE TABLE merchant_industries (
-    merchant TEXT PRIMARY KEY REFERENCES merchants(name),
-    scores_json TEXT, reason TEXT,
-    status TEXT,        -- 'verified' | 'needs_review'
-    method TEXT         -- 'gemini' | 'keyword fallback'
-);
--- The living profile: every run adds a row, so we keep the history
-CREATE TABLE industry_scores (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT, industry TEXT,
-    score REAL, computed_at TEXT
-);
-CREATE TABLE recommendations (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT, industry TEXT,
-    payload_json TEXT, created_at TEXT
-);
-CREATE TABLE notifications (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT, industry TEXT,
-    channel TEXT, moment TEXT, text TEXT, created_at TEXT
-);
-"""
+EVENT_TABLES = ("transactions", "app_events", "context_events")  # fixed names, never user input
 
 
 def connect() -> sqlite3.Connection:
@@ -60,25 +31,11 @@ def now() -> str:
 
 
 def reset_db() -> None:
-    """Delete the database and rebuild it from data/seed.json (only batch 0 released)."""
+    """Delete kbc.db and rebuild it from the two .sql files."""
     DB_PATH.unlink(missing_ok=True)
-    seed = json.loads(SEED_FILE.read_text(encoding="utf-8"))
     with connect() as conn:
-        conn.executescript(SCHEMA)
-        conn.executemany("INSERT INTO merchants VALUES (?, ?)",
-                         [(m["name"], m["description"]) for m in seed["merchants"]])
-        for c in seed["customers"]:
-            conn.execute(
-                "INSERT INTO customers VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (c["id"], c["name"], c["age"], c["gender"], c["occupation"], c["city"], c["language"],
-                 c["children"], c["preferred_channel"], c["active_hours"][0], c["active_hours"][1]),
-            )
-            conn.executemany(
-                "INSERT INTO transactions (customer_id, date, merchant, amount_eur, batch, released) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                [(c["id"], t["date"], t["merchant"], t["amount_eur"], t["batch"], int(t["batch"] == 0))
-                 for t in c["transactions"]],
-            )
+        conn.executescript(SCHEMA_FILE.read_text(encoding="utf-8"))
+        conn.executescript(SEED_FILE.read_text(encoding="utf-8"))
 
 
 def ensure_db() -> None:
@@ -86,109 +43,136 @@ def ensure_db() -> None:
         reset_db()
 
 
-# --- Reading ----------------------------------------------------------------
-def get_customers() -> list[dict]:
+def _rows(sql: str, params: tuple = ()) -> list[dict]:
     with connect() as conn:
-        return [dict(r) for r in conn.execute("SELECT * FROM customers ORDER BY id")]
+        return [dict(r) for r in conn.execute(sql, params)]
+
+
+# --- Input data -----------------------------------------------------------------
+def get_customers() -> list[dict]:
+    return _rows("SELECT * FROM customers ORDER BY id")
 
 
 def get_customer(customer_id: str) -> dict | None:
-    with connect() as conn:
-        row = conn.execute("SELECT * FROM customers WHERE id = ?", (customer_id,)).fetchone()
-    return dict(row) if row else None
+    rows = _rows("SELECT * FROM customers WHERE id = ?", (customer_id,))
+    return rows[0] if rows else None
 
 
 def get_transactions(customer_id: str) -> list[dict]:
-    """Only the transactions the bank has already received (released = 1)."""
+    """Only what the bank has already received (released = 1)."""
+    return _rows(
+        "SELECT t.ts, t.merchant, m.description, t.amount, t.currency, t.amount_eur, t.country "
+        "FROM transactions t JOIN merchants m ON m.name = t.merchant "
+        "WHERE t.customer_id = ? AND t.released = 1 ORDER BY t.ts", (customer_id,))
+
+
+def get_app_events(customer_id: str) -> list[dict]:
+    return _rows("SELECT ts, event, detail FROM app_events WHERE customer_id = ? AND released = 1 ORDER BY ts",
+                 (customer_id,))
+
+
+def get_context_events(customer_id: str) -> list[dict]:
+    return _rows("SELECT ts, event, detail, country FROM context_events "
+                 "WHERE customer_id = ? AND released = 1 ORDER BY ts", (customer_id,))
+
+
+def data_version(customer_id: str) -> int:
+    """Number of received events. Changes only when new data arrives."""
     with connect() as conn:
-        rows = conn.execute(
-            "SELECT t.date, t.merchant, m.description, t.amount_eur FROM transactions t "
-            "JOIN merchants m ON m.name = t.merchant "
-            "WHERE t.customer_id = ? AND t.released = 1 ORDER BY t.date",
-            (customer_id,),
-        )
-        return [dict(r) for r in rows]
+        return sum(conn.execute(f"SELECT COUNT(*) FROM {t} WHERE customer_id = ? AND released = 1",
+                                (customer_id,)).fetchone()[0] for t in EVENT_TABLES)
 
 
 def has_unreleased(customer_id: str) -> bool:
     with connect() as conn:
-        return conn.execute("SELECT 1 FROM transactions WHERE customer_id = ? AND released = 0",
-                            (customer_id,)).fetchone() is not None
+        return any(conn.execute(f"SELECT 1 FROM {t} WHERE customer_id = ? AND released = 0",
+                                (customer_id,)).fetchone() for t in EVENT_TABLES)
 
 
 def release_next_batch(customer_id: str) -> None:
-    """Demo: simulate that new transactions arrive at the bank."""
+    """Demo: simulate that new transactions / app actions / context signals arrive."""
     with connect() as conn:
-        row = conn.execute("SELECT MIN(batch) AS b FROM transactions WHERE customer_id = ? AND released = 0",
-                           (customer_id,)).fetchone()
-        if row["b"] is not None:
-            conn.execute("UPDATE transactions SET released = 1 WHERE customer_id = ? AND batch = ?",
-                         (customer_id, row["b"]))
+        batches = [conn.execute(f"SELECT MIN(batch) FROM {t} WHERE customer_id = ? AND released = 0",
+                                (customer_id,)).fetchone()[0] for t in EVENT_TABLES]
+        batches = [b for b in batches if b is not None]
+        if batches:
+            for t in EVENT_TABLES:
+                conn.execute(f"UPDATE {t} SET released = 1 WHERE customer_id = ? AND batch = ?",
+                             (customer_id, min(batches)))
 
 
+# --- Classification cache -------------------------------------------------------------
 def get_classification(merchant: str) -> dict | None:
-    with connect() as conn:
-        row = conn.execute("SELECT * FROM merchant_industries WHERE merchant = ?", (merchant,)).fetchone()
-    if not row:
-        return None
-    return {**dict(row), "scores": json.loads(row["scores_json"])}
+    rows = _rows("SELECT * FROM merchant_industries WHERE merchant = ?", (merchant,))
+    return {**rows[0], "scores": json.loads(rows[0]["scores_json"])} if rows else None
 
 
 def get_all_classifications() -> list[dict]:
-    with connect() as conn:
-        return [{**dict(r), "scores": json.loads(r["scores_json"])}
-                for r in conn.execute("SELECT * FROM merchant_industries ORDER BY merchant")]
+    return [{**r, "scores": json.loads(r["scores_json"])}
+            for r in _rows("SELECT * FROM merchant_industries ORDER BY merchant")]
 
 
-def get_score_history(customer_id: str) -> list[dict]:
-    with connect() as conn:
-        return [dict(r) for r in conn.execute(
-            "SELECT industry, score, computed_at FROM industry_scores WHERE customer_id = ? ORDER BY id",
-            (customer_id,))]
-
-
-def get_recommendations(customer_id: str) -> list[dict]:
-    with connect() as conn:
-        rows = conn.execute("SELECT industry, payload_json FROM recommendations WHERE customer_id = ? ORDER BY id",
-                            (customer_id,))
-        return [{"industry": r["industry"], **json.loads(r["payload_json"])} for r in rows]
-
-
-def get_notifications(customer_id: str) -> list[dict]:
-    with connect() as conn:
-        return [dict(r) for r in conn.execute(
-            "SELECT * FROM notifications WHERE customer_id = ? ORDER BY id DESC", (customer_id,))]
-
-
-# --- Writing ----------------------------------------------------------------
 def save_classification(merchant: str, scores: dict, reason: str, status: str, method: str) -> None:
     with connect() as conn:
         conn.execute("INSERT OR REPLACE INTO merchant_industries VALUES (?, ?, ?, ?, ?)",
                      (merchant, json.dumps(scores), reason, status, method))
 
 
-def save_scores(customer_id: str, scores: dict[str, float]) -> None:
+# --- Living profile ----------------------------------------------------------------------
+def save_intent_scores(customer_id: str, scores: dict[str, float], version: int) -> None:
+    """Store a history row only when new data arrived (not on every page refresh)."""
     with connect() as conn:
-        conn.executemany("INSERT INTO industry_scores (customer_id, industry, score, computed_at) VALUES (?, ?, ?, ?)",
-                         [(customer_id, ind, s, now()) for ind, s in scores.items()])
+        last = conn.execute("SELECT MAX(data_version) FROM intent_scores WHERE customer_id = ?",
+                            (customer_id,)).fetchone()[0]
+        if last != version:
+            conn.executemany("INSERT INTO intent_scores (customer_id, intent, score, data_version, computed_at) "
+                             "VALUES (?, ?, ?, ?, ?)",
+                             [(customer_id, i, s, version, now()) for i, s in scores.items()])
 
 
-def replace_recommendations(customer_id: str, updates: list[dict]) -> None:
-    """The For You page always shows the CURRENT situation, so old cards are replaced."""
+def get_intent_history(customer_id: str) -> list[dict]:
+    return _rows("SELECT intent, score, data_version FROM intent_scores WHERE customer_id = ? ORDER BY id",
+                 (customer_id,))
+
+
+# --- For You page, notifications, feedback -----------------------------------------------
+def get_for_you_page(customer_id: str) -> dict | None:
+    rows = _rows("SELECT * FROM for_you_page WHERE customer_id = ?", (customer_id,))
+    return {"signature": rows[0]["signature"], "content": json.loads(rows[0]["content_json"])} if rows else None
+
+
+def save_for_you_page(customer_id: str, signature: str, content: dict) -> None:
     with connect() as conn:
-        conn.execute("DELETE FROM recommendations WHERE customer_id = ?", (customer_id,))
-        conn.executemany("INSERT INTO recommendations (customer_id, industry, payload_json, created_at) "
-                         "VALUES (?, ?, ?, ?)",
-                         [(customer_id, u["industry"], json.dumps(u), now()) for u in updates])
+        conn.execute("INSERT OR REPLACE INTO for_you_page VALUES (?, ?, ?, ?)",
+                     (customer_id, signature, json.dumps(content), now()))
 
 
-def already_notified(customer_id: str, industry: str) -> bool:
+def clear_for_you_page(customer_id: str) -> None:
     with connect() as conn:
-        return conn.execute("SELECT 1 FROM notifications WHERE customer_id = ? AND industry = ?",
-                            (customer_id, industry)).fetchone() is not None
+        conn.execute("DELETE FROM for_you_page WHERE customer_id = ?", (customer_id,))
 
 
-def save_notification(customer_id: str, industry: str, channel: str, moment: str, text: str) -> None:
+def notified_intents(customer_id: str) -> set[str]:
+    rows = _rows("SELECT intents FROM notifications WHERE customer_id = ?", (customer_id,))
+    return {i for r in rows for i in r["intents"].split(",")}
+
+
+def save_notification(customer_id: str, intents: list[str], channel: str, moment: str, text: str) -> None:
     with connect() as conn:
-        conn.execute("INSERT INTO notifications (customer_id, industry, channel, moment, text, created_at) "
-                     "VALUES (?, ?, ?, ?, ?, ?)", (customer_id, industry, channel, moment, text, now()))
+        conn.execute("INSERT INTO notifications (customer_id, intents, channel, moment, text, created_at) "
+                     "VALUES (?, ?, ?, ?, ?, ?)", (customer_id, ",".join(intents), channel, moment, text, now()))
+
+
+def get_notifications(customer_id: str) -> list[dict]:
+    return _rows("SELECT * FROM notifications WHERE customer_id = ? ORDER BY id DESC", (customer_id,))
+
+
+def save_feedback(customer_id: str, widget_id: str, reaction: str) -> None:
+    with connect() as conn:
+        conn.execute("INSERT INTO feedback (customer_id, widget_id, reaction, created_at) VALUES (?, ?, ?, ?)",
+                     (customer_id, widget_id, reaction, now()))
+
+
+def dismissed_widgets(customer_id: str) -> set[str]:
+    return {r["widget_id"] for r in _rows(
+        "SELECT widget_id FROM feedback WHERE customer_id = ? AND reaction = 'not_for_me'", (customer_id,))}

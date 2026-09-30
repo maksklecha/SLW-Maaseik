@@ -1,43 +1,50 @@
-"""The Context Engine as a LangGraph pipeline (run once per customer, e.g. when new transactions arrive).
+"""The Context Engine as a LangGraph pipeline: Understand → Recognize → Adapt → (notify).
 
- START → load_data → classify_merchants → verify_classification → score_industries
-                                                                        │
-                                   below every benchmark ──► END (nothing to show = no spam)
-                                   above a benchmark ↓
-                                recommend → notify → END
+ START → load_data → classify_merchants → verify_classification → score_industries → score_intents
+         UNDERSTAND   (classification agent)  (verification agent)   (team formula)     RECOGNIZE
+                                                                                           │
+                                   no intent above threshold ──► clear page → END (no spam)
+                                   intent(s) validated ↓
+                          advisor (For You page, ADAPT) → notify (right channel + moment) → END
 
-- Node  = one step (a Python function that gets the state and returns what it changes).
+- Node  = one step: a Python function that receives the state and returns what it changes.
 - Edge  = the arrow to the next step. A *conditional* edge picks the next step with a function.
 - State = the dictionary (EngineState) that travels through all nodes.
 """
 from typing import TypedDict
 
+from langgraph.graph import END, START, StateGraph
+
 import agents
 import db
 import scoring
 import signals
-from langgraph.graph import END, START, StateGraph
 
 
 class EngineState(TypedDict, total=False):
     customer_id: str
     customer: dict
     transactions: list[dict]
-    drafts: dict           # merchant -> classification before verification
-    classifications: dict  # merchant -> verified classification
-    breakdown: dict        # industry -> score details
-    triggered: list[str]   # industries above their benchmark
-    updates: list[dict]    # For You page content
-    notifications: list[dict]
+    app_events: list[dict]
+    contexts: list[dict]
+    drafts: dict            # merchant -> classification before verification
+    classifications: dict   # merchant -> verified classification
+    industries: dict        # industry -> score details
+    intents: dict           # intent -> score + evidence
+    validated: list[str]    # intents above the threshold
+    page: dict              # For You page content
+    notification: dict | None
 
 
+# --- UNDERSTAND ---------------------------------------------------------------------------
 def load_data(state: EngineState) -> dict:
-    return {"customer": db.get_customer(state["customer_id"]),
-            "transactions": db.get_transactions(state["customer_id"])}
+    cid = state["customer_id"]
+    return {"customer": db.get_customer(cid), "transactions": db.get_transactions(cid),
+            "app_events": db.get_app_events(cid), "contexts": db.get_context_events(cid)}
 
 
 def classify_merchants(state: EngineState) -> dict:
-    """Agent step. Only NEW merchants are classified; known ones come from the cache table."""
+    """Classification agent. Only NEW merchants; known ones come from the cache table."""
     llm = agents.get_llm()
     drafts = {}
     for t in state["transactions"]:
@@ -48,57 +55,77 @@ def classify_merchants(state: EngineState) -> dict:
 
 
 def verify_classification(state: EngineState) -> dict:
+    """Verification agent + rule check, then store in the cache."""
     llm = agents.get_llm()
     for m, draft in state["drafts"].items():
         final = agents.verify(m, draft["description"], draft, llm)
         db.save_classification(m, final["scores"], final["reason"], final["status"], final["method"])
-    merchants = {t["merchant"] for t in state["transactions"]}
-    return {"classifications": {m: db.get_classification(m) for m in merchants}}
+    return {"classifications": {t["merchant"]: db.get_classification(t["merchant"]) for t in state["transactions"]}}
 
 
 def score_industries(state: EngineState) -> dict:
-    breakdown = scoring.industry_breakdown(state["transactions"], state["classifications"])
-    db.save_scores(state["customer_id"], {ind: b["score"] for ind, b in breakdown.items()})
-    return {"breakdown": breakdown, "triggered": scoring.above_benchmark(breakdown)}
+    return {"industries": scoring.industry_breakdown(state["transactions"], state["classifications"])}
 
 
-def route_after_scoring(state: EngineState) -> str:
-    return "recommend" if state["triggered"] else END
+# --- RECOGNIZE ---------------------------------------------------------------------------
+def score_intents(state: EngineState) -> dict:
+    intents = scoring.intent_scores(state["customer"], state["industries"], state["transactions"],
+                                    state["app_events"], state["contexts"])
+    db.save_intent_scores(state["customer_id"], {k: v["score"] for k, v in intents.items()},
+                          db.data_version(state["customer_id"]))
+    return {"intents": intents, "validated": scoring.validated_intents(intents)}
 
 
-def recommend(state: EngineState) -> dict:
-    llm = agents.get_llm()
-    updates = [{"industry": ind, **agents.recommend(state["customer"], ind, state["breakdown"][ind], llm)}
-               for ind in state["triggered"]]
-    db.replace_recommendations(state["customer_id"], updates)
-    return {"updates": updates}
+def route_after_intents(state: EngineState) -> str:
+    return "advisor" if state["validated"] else "no_update"
+
+
+def no_update(state: EngineState) -> dict:
+    db.clear_for_you_page(state["customer_id"])
+    return {"page": None, "notification": None}
+
+
+# --- ADAPT --------------------------------------------------------------------------------
+def advisor(state: EngineState) -> dict:
+    """Advisor agent builds the For You page. Only calls Gemini when the situation changed."""
+    signature = ",".join(state["validated"])
+    existing = db.get_for_you_page(state["customer_id"])
+    if existing and existing["signature"] == signature:
+        return {"page": existing}
+    page = agents.build_for_you_page(state["customer"], state["validated"], state["intents"],
+                                     state["industries"], agents.get_llm())
+    db.save_for_you_page(state["customer_id"], signature, page)
+    return {"page": {"signature": signature, "content": page}}
 
 
 def notify(state: EngineState) -> dict:
-    """One notification per newly triggered industry — never twice for the same thing."""
+    """One notification for NEW intents only (never twice for the same thing), right channel + moment."""
     c = state["customer"]
-    sent = []
-    for u in state["updates"]:
-        if not db.already_notified(c["id"], u["industry"]):
-            n = {"industry": u["industry"], "channel": signals.pick_channel(c),
-                 "moment": signals.pick_moment(c), "text": u["notification"]}
-            db.save_notification(c["id"], **n)
-            sent.append(n)
-    return {"notifications": sent}
+    new = [i for i in state["validated"] if i not in db.notified_intents(c["id"])]
+    if not new:
+        return {"notification": None}
+    page = state["page"]["content"]
+    n = {"intents": new, "channel": signals.pick_channel(c),
+         "moment": signals.pick_moment(c, state["contexts"], new), "text": page["notification"]}
+    db.save_notification(c["id"], **n)
+    return {"notification": n}
 
 
 def build_graph():
     g = StateGraph(EngineState)
     for name, fn in [("load_data", load_data), ("classify_merchants", classify_merchants),
                      ("verify_classification", verify_classification), ("score_industries", score_industries),
-                     ("recommend", recommend), ("notify", notify)]:
+                     ("score_intents", score_intents), ("no_update", no_update),
+                     ("advisor", advisor), ("notify", notify)]:
         g.add_node(name, fn)
     g.add_edge(START, "load_data")
     g.add_edge("load_data", "classify_merchants")
     g.add_edge("classify_merchants", "verify_classification")
     g.add_edge("verify_classification", "score_industries")
-    g.add_conditional_edges("score_industries", route_after_scoring, ["recommend", END])
-    g.add_edge("recommend", "notify")
+    g.add_edge("score_industries", "score_intents")
+    g.add_conditional_edges("score_intents", route_after_intents, ["advisor", "no_update"])
+    g.add_edge("no_update", END)
+    g.add_edge("advisor", "notify")
     g.add_edge("notify", END)
     return g.compile()
 

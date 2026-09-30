@@ -1,21 +1,22 @@
 # HANDOFF — Tectonic Hackathon (KBC challenge) · Team SLW Maaseik
 
-> **UPDATE (latest decisions, these override §3–§4 below):** the repo now implements the
-> **Context Engine** described in `README.md`:
-> - **LLM:** Google Gemini, via `langchain-google-genai` and `GOOGLE_API_KEY`.
-> - **3 industries** in `config.py`: travel, construction, baby & pregnancy.
-> - **Industry classification agent** (0–10 per industry, cached per merchant) + a **verification step** (rule check + Gemini judge, one retry, else `needs_review`).
-> - **Formula:** `score = Σ (relevance/10) × visits² × (total_spent / avg_expense)` (`scoring.py`).
-> - **Per-industry benchmark** → Gemini recommender writes the For You cards with "more info" → notification via the right channel (65+ → phone call) and moment (`signals.py`).
-> - **Pipeline:** `graph.py`. **Data:** `data/seed.json` → SQLite `kbc.db` (`db.py`). **UI:** `app.py`.
-> - Behavioural and context signals are listed as next steps.
-
-> **For Claude Code:** read this whole file before doing anything. It is the full context
-> of an earlier planning session. The team are **3 Python beginners** who just finished a
-> LangChain/LangGraph course. Explain what you do in plain language, define framework terms
-> (node, edge, state, tool, agent, structured output...), flag beginner pitfalls, and keep the
-> code simple, well-commented and readable. Prefer a working small thing over an ambitious broken one.
-
+> **UPDATE (latest decisions, these override §3–§4 below):** see `README.md` for the full current design.
+> - **Context Engine:** Understand → Recognize → Adapt → Scale, built as a LangGraph pipeline in `graph.py`.
+> - **3 signal types:** transactions, in-app `app_events`, `context_events`.
+> - **3 fake customers** in a real SQL database: `database/schema.sql` + `database/seed.sql` → `kbc.db`.
+>   - Yusuf: expecting a child
+>   - Lotte: travel, yen payments, airport
+>   - Marc (68): renovation + budget stress → phone call
+> - **Gemini agents** (`agents.py`):
+>   - classification (0–10 per industry, cached),
+>   - verification (rule check + reviewer, retry, `needs_review`),
+>   - advisor (For You page from the widget library in `config.py`).
+> - **Two formulas** (`scoring.py`):
+>   - team industry formula: `Σ (rel/10) × visits² × spent/avg`,
+>   - Intent Score: `1 − Π(1 − weight × strength)`, threshold 70%.
+> - **Right channel / moment:** `signals.py`.
+> - **Checks:** `python verify_concept.py` runs 30 automatic checks, all passing.
+> - **Key handling:** never commit a key. Use `.env` locally, or Streamlit Cloud secrets for a shared online demo.
 ---
 
 ## 1. The hackathon (facts from the official Participants Guide)

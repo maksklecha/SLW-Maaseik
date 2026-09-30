@@ -13,3 +13,4 @@ __pycache__/
 
 # Local demo database (rebuilt from data/seed.json)
 kbc.db
+.streamlit/secrets.toml
