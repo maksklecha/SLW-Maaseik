@@ -90,10 +90,13 @@ def advisor(state: EngineState) -> dict:
     """Advisor agent builds the For You page. Only calls Gemini when the situation changed."""
     signature = ",".join(state["validated"])
     existing = db.get_for_you_page(state["customer_id"])
-    if existing and existing["signature"] == signature:
+    llm = agents.get_llm()
+    # Reuse the saved page, unless it was made with templates and Gemini is available now
+    # (e.g. Gemini was busy last time, or the key was added later)
+    if existing and existing["signature"] == signature and (existing["content"]["method"] == "gemini" or not llm):
         return {"page": existing}
     page = agents.build_for_you_page(state["customer"], state["validated"], state["intents"],
-                                     state["industries"], agents.get_llm())
+                                     state["industries"], llm)
     db.save_for_you_page(state["customer_id"], signature, page)
     return {"page": {"signature": signature, "content": page}}
 

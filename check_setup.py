@@ -18,9 +18,9 @@ if not os.getenv("GOOGLE_API_KEY"):
 
 from langchain.chat_models import init_chat_model  # noqa: E402
 
-model_name = os.getenv("MODEL", "google_genai:gemini-2.5-flash")
+model_name = os.getenv("MODEL", "google_genai:gemini-3.1-flash-lite")
 print(f"Testing model: {model_name} ...")
 
 llm = init_chat_model(model_name)
 reply = llm.invoke("Say 'setup works!' and nothing else.")
-print("Model replied:", reply.content)
+print("Model replied:", reply.text)

@@ -1,4 +1,4 @@
-LLM: no API key → keyword classifier + template texts
+LLM: Gemini
 
 ======================================================================
 BEFORE — Yusuf's history (one visit to a childwear shop)
@@ -7,15 +7,17 @@ BEFORE — Yusuf's history (one visit to a childwear shop)
 📥 Data received: 3 transactions, 0 app actions, 0 context signals
 
 1) Classification agent (+ verification):
-   Colruyt                  no relevant industry  [verified, keyword fallback]
-   Engie                    no relevant industry  [verified, keyword fallback]
-   Little Stars Childwear   {'Baby & pregnancy': 9}  [verified, keyword fallback]
+   Colruyt                  {'Baby & pregnancy': 2, 'Construction & renovation': 1}  [verified, gemini]
+   Engie                    {'Construction & renovation': 1}  [verified, gemini]
+   Little Stars Childwear   {'Baby & pregnancy': 10}  [verified, gemini]
 
 2) Industry score vs benchmark (team formula):
-   Baby & pregnancy: 0.9×1²×(55/40) = 1.24  (benchmark 50)
+   Baby & pregnancy: 1.0×1²×(55/40) + 0.2×1²×(84.2/40) = 1.8  (benchmark 50)
+   Construction & renovation: 0.1×1²×(140/80) + 0.1×1²×(84.2/80) = 0.29  (benchmark 60)
 
 3) Intent Scores (threshold 70%):
-   Expecting / planning a child   2%  ⚪ below threshold
+   Expecting / planning a child   3%  ⚪ below threshold
+   Home renovation                0%  ⚪ below threshold
 
 4) Notification: none — nothing important to tell (no spam)
 
@@ -29,26 +31,28 @@ AFTER — new data arrives (more childwear visits, maternity shop, app actions)
 📥 Data received: 7 transactions, 2 app actions, 0 context signals
 
 1) Classification agent (+ verification):
-   Colruyt                  no relevant industry  [verified, keyword fallback]
-   Engie                    no relevant industry  [verified, keyword fallback]
-   Little Stars Childwear   {'Baby & pregnancy': 9}  [verified, keyword fallback]
-   Prenatal Antwerpen       {'Baby & pregnancy': 10}  [verified, keyword fallback]
+   Colruyt                  {'Baby & pregnancy': 2, 'Construction & renovation': 1}  [verified, gemini]
+   Engie                    {'Construction & renovation': 1}  [verified, gemini]
+   Little Stars Childwear   {'Baby & pregnancy': 10}  [verified, gemini]
+   Prenatal Antwerpen       {'Baby & pregnancy': 10}  [verified, gemini]
 
 2) Industry score vs benchmark (team formula):
-   Baby & pregnancy: 0.9×4²×(240/40) + 1.0×1²×(80/40) = 88.4  (benchmark 50)
+   Baby & pregnancy: 1.0×4²×(240/40) + 1.0×1²×(80/40) + 0.2×1²×(84.2/40) = 98.42  (benchmark 50)
+   Construction & renovation: 0.1×1²×(140/80) + 0.1×1²×(84.2/80) = 0.29  (benchmark 60)
 
 3) Intent Scores (threshold 70%):
    Expecting / planning a child   94%  ✅ validated
+   Home renovation                0%  ⚪ below threshold
 
 4) Notification: 📱 Push notification · Today between 15:00 and 17:00 (when they usually use their phone)
-   🔔 “Your For You page has an update — Planning for your family's future?”
+   🔔 “Yusuf, we hebben nieuwe tips klaarstaan om je gezinsbudget slim te plannen.”
 
 5) For You page:
-   ## Planning for your family's future?
-   • KBC Kids Savings Account: Start saving for your child's future from day one.
-     More info: A savings account in your child's name. Set up a small automatic monthly transfer; family can contribute too. Your child gets access at 18.
-   • Family insurance update: Make sure your family insurance fits a growing family.
-     More info: Family (civil liability) insurance covers damage caused to others by members of your family. Add a new family member in the app, without paperwork.
-   • Family budget planner: See what a growing family means for your budget.
-     More info: Estimate new monthly costs such as childcare, clothing and health, and how much you can save.
-   (texts written by: template fallback)
+   ## Plannen voor de toekomst van je gezin?
+   • Plan je gezinsbudget vooraf: Als verpleegkundige met wisselende diensten is een helder overzicht van je toekomstige gezinsuitgaven wel zo rustgevend.
+     More info: Met onze budgetplanner schat je eenvoudig nieuwe maandelijkse kosten in voor kinderopvang, kleding en gezondheidszorg. Zo zie je meteen hoeveel je kunt sparen voor de toekomst. Dit helpt je om financieel uitstekend voorbereid te zijn op de komst van een nieuw gezinslid.
+   • Sparen voor je kind: Begin al vroeg met het opbouwen van een financieel duwtje in de rug voor later.
+     More info: Met de KBC-Spaarrekening voor Kinderen zet je eenvoudig maandelijks een vast bedrag opzij. Ook grootouders of andere familieleden kunnen gemakkelijk een bijdrage leveren. Je kind krijgt op de 18e verjaardag zelf toegang tot dit opgebouwde spaarpotje.
+   • Je familiale verzekering aanpassen: Zorg ervoor dat je gezin in Antwerpen altijd goed beschermd is tegen onverwachte schade aan derden.
+     More info: De familiale verzekering dekt de schade die door gezinsleden aan anderen wordt toegebracht. Je kunt nieuwe gezinsleden heel eenvoudig en zonder papierwerk toevoegen via de app. Zo blijft je gezin altijd optimaal beschermd tegen onvoorziene kosten.
+   (texts written by: gemini)

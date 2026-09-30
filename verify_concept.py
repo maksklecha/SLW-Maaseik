@@ -186,7 +186,7 @@ advisor_prompts = [p for s, p in stub.calls if s == "ForYouUpdate"]
 check("Advisor prompt forbids using gender and stating sensitive guesses",
       all("NEVER use gender" in p and "NEVER state sensitive guesses" in p for p in advisor_prompts))
 check("Advisor writes in the customer's language (Yusuf → Dutch, Marc → French)",
-      any("Yusuf" in p and "Dutch" in p for p in advisor_prompts) and any("Marc" in p and "French" in p for p in advisor_prompts))
+      any("Yusuf" in p and "in Dutch" in p for p in advisor_prompts) and any("Marc" in p and "French" in p for p in advisor_prompts))
 before = len(stub.calls)
 graph.run("C002")
 check("Page refresh without new data makes NO new Gemini calls", len(stub.calls) == before)

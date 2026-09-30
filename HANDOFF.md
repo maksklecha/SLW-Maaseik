@@ -16,6 +16,7 @@
 >   - Intent Score: `1 − Π(1 − weight × strength)`, threshold 70%.
 > - **Right channel / moment:** `signals.py`.
 > - **Checks:** `python verify_concept.py` runs 30 automatic checks, all passing.
+> - **Gemini:** tested live. The model chain is `gemini-3.1-flash-lite`, then `gemini-3.5-flash`, then `gemini-3.8-flash` (`agents.GeminiWithBackups`).
 > - **Key handling:** never commit a key. Use `.env` locally, or Streamlit Cloud secrets for a shared online demo.
 ---
 

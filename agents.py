@@ -17,7 +17,8 @@ from config import INDUSTRIES, INTENTS, MAX_RELEVANCE, MAX_WIDGETS_PER_INTENT, W
 
 load_dotenv()
 
-DEFAULT_MODEL = "google_genai:gemini-2.5-flash"
+DEFAULT_MODEL = "google_genai:gemini-3.1-flash-lite"   # fast; the backups take over when it is busy
+BACKUP_MODELS = ["google_genai:gemini-3.5-flash", "google_genai:gemini-3.8-flash"]
 LANGUAGES = {"nl": "Dutch", "fr": "French", "en": "English"}
 
 
@@ -36,12 +37,32 @@ def get_api_key() -> str | None:
     return key
 
 
+class GeminiWithBackups:
+    """Tries the main Gemini model first; if Google says 'busy' (503) or 'limit reached' (429),
+    it switches straight to the next model instead of waiting. Free-tier limits are per model,
+    so a backup model usually still has capacity."""
+
+    def __init__(self, model_names: list[str]):
+        from langchain.chat_models import init_chat_model
+        self.models = [init_chat_model(m, temperature=0, max_retries=1, timeout=60) for m in model_names]
+
+    def with_structured_output(self, schema):
+        first, *rest = [m.with_structured_output(schema) for m in self.models]
+        return first.with_fallbacks(rest) if rest else first
+
+
+_llm_cache = {}
+
+
 def get_llm():
-    """The Gemini chat model, or None when no key is configured (→ fallbacks are used)."""
+    """The Gemini model chain, or None when no key is configured (→ rule/template fallbacks are used)."""
     if not get_api_key():
         return None
-    from langchain.chat_models import init_chat_model
-    return init_chat_model(os.getenv("MODEL", DEFAULT_MODEL), temperature=0)
+    names = [os.getenv("MODEL", DEFAULT_MODEL)] + [m for m in BACKUP_MODELS if m != os.getenv("MODEL", DEFAULT_MODEL)]
+    key = tuple(names)
+    if key not in _llm_cache:
+        _llm_cache[key] = GeminiWithBackups(names)
+    return _llm_cache[key]
 
 
 # --- Output schemas ----------------------------------------------------------------------------
@@ -92,9 +113,13 @@ def _to_dict(scores: list[IndustryRelevance]) -> dict[str, int]:
     return out
 
 
+MAIN_INDUSTRY_MIN = 5  # a company only "belongs" to an industry from 5/10 up (1-4 = weak link)
+
+
 def _top(scores: dict[str, int]) -> str | None:
+    """The company's main industry, or None when no industry scores at least 5/10."""
     best = max(scores, key=scores.get)
-    return best if scores[best] > 0 else None
+    return best if scores[best] >= MAIN_INDUSTRY_MIN else None
 
 
 # --- 1. Classification agent ----------------------------------------------------------------
@@ -183,7 +208,9 @@ def build_for_you_page(customer: dict, intents: list[str], scores: dict, industr
         r = llm.with_structured_output(ForYouUpdate).invoke(
             "You are the advisor agent of the KBC banking app. You build the customer's 'For You' page: "
             "essential, helpful information only — no advertising tone, not pushy.\n"
-            f"Write everything in {LANGUAGES.get(customer['language'], 'English')}.\n"
+            f"LANGUAGE: write EVERY text field (headline, title, message, more_info, notification) in "
+            f"{LANGUAGES.get(customer['language'], 'English')}. Translate the headline style too; "
+            "never mix languages.\n"
             f"For EACH intent below make one section and choose 1 to {MAX_WIDGETS_PER_INTENT} of its widgets, "
             "most useful first. Only use the given intent keys and widget ids.\n"
             "Rules:\n"

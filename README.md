@@ -39,7 +39,7 @@ through the **right channel**.
 | Customer | New data | Intent | For You page | Notification |
 |---|---|---|---|---|
 | **Yusuf**, 31, nurse, **0 children** | 3 more childwear visits, a maternity store, looked at child savings | Expecting a child **94%** | 1-click kids' savings account, family insurance update, budget planner | 📱 Push, 15–17h |
-| **Lotte**, 27, developer | Hotel bookings, 2nd flight, **payments in JPY**, opened the app at **Narita airport** | International travel **98%** | Currency converter, unblock card worldwide, luggage micro-insurance | 📱 Push, **right now** |
+| **Lotte**, 27, developer | Hotel bookings, 2nd flight, **payments in JPY**, opened the app at **Narita airport** | International travel **98%** | Currency converter, unblock card worldwide, pay-smart tips (Gemini picks 3 of 5 travel widgets, incl. luggage micro-insurance) | 📱 Push, **right now** |
 | **Marc**, 68, retired homeowner | 4× DIY store, tile shop, unfinished loan simulator, balance checks at month-end | Home renovation **92%** + budget stress **74%** | Renovation loan simulator, home insurance check, month overview, advisor call | 📞 **Phone call**, weekday 9–11h |
 
 Before the new data arrives, all three are below the threshold, so they see the normal home screen with no message.
@@ -47,7 +47,11 @@ Before the new data arrives, all three are below the threshold, so they see the 
 ## Walkthrough: Yusuf, before and after
 
 Run `python example.py` to see this in your terminal. No Streamlit or API key is needed.
-A saved run is in **[examples/yusuf_output.txt](examples/yusuf_output.txt)**. It was made without an API key, so it shows the keyword classifier and template texts.
+Saved runs:
+- **[examples/yusuf_output.txt](examples/yusuf_output.txt)**: a real run **with Gemini**. The classification and verification agents ran on Gemini, and the For You texts are written in Dutch for Yusuf.
+- **[examples/yusuf_output_no_key.txt](examples/yusuf_output_no_key.txt)**: the same run without an API key, using the keyword classifier and template texts.
+
+With Gemini the numbers differ slightly, because Gemini rates Little Stars Childwear 10/10 instead of the keyword rule's 9/10: 98.0 instead of 88.4. The worked example below uses the no-key numbers, which are always the same.
 
 | Step | Before (history) | After "new data arrives" |
 |---|---|---|
@@ -79,7 +83,12 @@ These numbers are checked automatically in [test_scoring.py](test_scoring.py). R
 ### What is tested, and what is not
 - ✅ **Unit tests** (`pytest`): 7 tests of the formulas and scenarios.
 - ✅ **`python verify_concept.py`**: 35 checks of every mechanism, including the Gemini code paths with a stub model (verification retry, output guardrails, no duplicate notifications, no repeated LLM calls).
-- ⚠️ **Not yet run against the live Gemini API.** The Gemini client is created and wired up, but real Gemini answers haven't been checked. With a key, the texts are written by Gemini instead of the templates in the saved example.
+- ✅ **Tested against the live Gemini API** with all 3 customers:
+  - Every company is classified and verified by Gemini.
+  - The For You pages come back in the right language: Dutch for Yusuf, English for Lotte, French for Marc.
+  - The texts are personal, e.g. they mention Yusuf's changing shifts as a nurse.
+  - Model: `gemini-3.1-flash-lite`, with `gemini-3.5-flash` and `gemini-3.8-flash` as automatic backups when a model is busy (503) or over its free-tier limit (429).
+  - A full first run takes about 1 minute; after that, companies and pages are cached.
 - ⚠️ **Unfinished:** see the list below.
 
 ### Why it scales to 2.3M customers
@@ -123,7 +132,8 @@ Anyone with the link then uses Gemini. **Never commit a key to this repo.**
 | `app.py` | Streamlit demo: For You page, Context Engine view, At scale |
 | `verify_concept.py` | Automatic checks of the whole concept |
 | `example.py` | One-command demo for one customer, printed as a story |
-| `examples/yusuf_output.txt` | Saved output of `example.py` (no API key) |
+| `examples/yusuf_output.txt` | Saved output of `example.py` with Gemini |
+| `examples/yusuf_output_no_key.txt` | Saved output of `example.py` without an API key |
 | `test_scoring.py` | Unit tests (pytest) |
 
 ## Unfinished / next steps
@@ -131,7 +141,7 @@ Anyone with the link then uses Gemini. **Never commit a key to this repo.**
 - Learning from feedback: "Not for me" hides a widget, but doesn't yet lower future scores.
 - Real delivery of push, email and phone calls, and real card or insurance actions.
 - Authentication: the customer picker is for the demo only. A real app shows only the logged-in customer's own data.
-- Not yet run against the live Gemini API (the Gemini paths are tested with a stub model in `verify_concept.py`).
+- Button labels inside the widgets (e.g. "Open a child savings account") are fixed English text; only the card texts are translated by Gemini.
 
 ## Security & privacy
 - Fake data only. `.env`, `kbc.db` and Streamlit secrets are git-ignored.
