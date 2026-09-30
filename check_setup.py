@@ -8,7 +8,7 @@ import os
 
 load_dotenv()  # reads the .env file and puts its values in os.environ
 
-model_name = os.getenv("MODEL", "anthropic:claude-sonnet-5-5")
+model_name = os.getenv("MODEL", "google_genai:gemini-2.5-flash")
 print(f"Testing model: {model_name} ...")
 
 llm = init_chat_model(model_name)

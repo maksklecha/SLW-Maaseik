@@ -1,86 +1,114 @@
-"""The demo UI (what the jury sees). Run with:
+"""The demo UI (what the jury sees in the video). Run with:
 
     streamlit run app.py
+
+Streamlit re-runs this whole file on every click. All state lives in the
+SQLite database, so nothing is lost between re-runs.
 """
+import pandas as pd
 import streamlit as st
 
-import signals as sig
-from graph import graph
+import agents
+import db
+from config import INDUSTRIES
+from graph import run
 
 st.set_page_config(page_title="KBC For You", page_icon="💙", layout="wide")
+db.ensure_db()
 
-today, customers = sig.load_customers()
-by_name = {c["name"]: c for c in customers}
+st.title("💙 KBC For You — Context Engine")
+st.caption("Proof of concept with 100% fake customers. "
+           + ("LLM: **Gemini connected**" if agents.get_llm() else "LLM: **no API key → rule/template fallback**"))
 
-st.title("💙 KBC For You")
-st.caption("The right message, at the right moment, through the right channel — for every one of 2.3M customers. "
-           "Demo with 100% fake customers.")
+with st.sidebar:
+    customers = db.get_customers()
+    labels = {f"{c['name']} ({c['age']}, {c['occupation']})": c["id"] for c in customers}
+    customer_id = labels[st.selectbox("Customer (demo)", list(labels))]
+    c = db.get_customer(customer_id)
+    st.markdown(f"**{c['name']}** · {c['age']} · {c['gender']}  \n{c['occupation']}  \n📍 {c['city']}  \n"
+                f"👶 Children: {c['children']}  \n🗣️ Language: {c['language'].upper()}  \n"
+                f"📨 Prefers: {c['preferred_channel']}  \n🕒 Active {c['active_hour_start']:02d}–{c['active_hour_end']:02d}h")
+    st.divider()
+    if st.button("💳 New transactions arrive", type="primary", disabled=not db.has_unreleased(customer_id),
+                 use_container_width=True):
+        db.release_next_batch(customer_id)
+    if st.button("↺ Reset demo data", use_container_width=True):
+        db.reset_db()
+        st.rerun()
 
-tab_feed, tab_scale = st.tabs(["For You page", "At scale"])
+# Run the Context Engine on the transactions the bank has received so far
+with st.spinner("Context Engine is analysing transactions..."):
+    state = run(customer_id)
 
+tab_fyp, tab_engine, tab_scale = st.tabs(["📱 For You page", "⚙️ Context Engine", "🌍 At scale"])
 
-@st.cache_data(show_spinner=False)
-def run_feed(customer_id: str) -> dict:
-    """Run the graph once per customer and cache it (so the LLM isn't called on every click)."""
-    customer = next(c for c in customers if c["id"] == customer_id)
-    return graph.invoke({"customer": customer, "today": today})
+# --- For You page -----------------------------------------------------------------
+with tab_fyp:
+    for n in db.get_notifications(customer_id):
+        st.success(f"**{n['channel']}** · {n['moment']}  \n🔔 “{n['text']}”")
 
-
-with tab_feed:
-    left, right = st.columns([1, 2])
-
-    with left:
-        name = st.selectbox("Customer (demo)", list(by_name))
-        c = by_name[name]
-        with st.container(border=True):
-            st.subheader(c["name"])
-            st.write(f"**{c['age']}** · {c['gender']} · {c['occupation']}")
-            st.write(f"📍 {c['city']} · now in **{c['location_now']}**")
-            st.write(f"🗣️ Language: {c['language'].upper()} · prefers **{c['preferred_channel']}**")
-            st.write(f"🕒 Usually active {c['active_hours'][0]:02d}:00–{c['active_hours'][1]:02d}:00")
-        with st.expander("Recent transactions"):
-            st.dataframe(
-                [{k: t[k] for k in ("date", "merchant", "amount", "currency", "country")} for t in c["transactions"]],
-                hide_index=True,
-            )
-
-    with right:
-        with st.spinner("Building the For You page..."):
-            result = run_feed(c["id"])
-        feed = result["feed"]
-
-        if not feed:
-            st.info("Nothing relevant right now — and that's fine. No spam.")
-        for item in feed:
+    updates = db.get_recommendations(customer_id)
+    if not updates:
+        st.info("Nothing new for you right now. (No benchmark crossed → no message, no spam.)")
+    for u in updates:
+        b = state["breakdown"][u["industry"]]
+        st.subheader(f"For you: {INDUSTRIES[u['industry']]['label']}")
+        for card in u["cards"]:
             with st.container(border=True):
-                top = st.columns([3, 1])
-                top[0].markdown(f"#### {item['title']}")
-                top[1].markdown(f"`{item['category']}`")
-                st.write(item["message"])
-                if item["signal"].get("value_eur"):
-                    st.metric("Estimated value for you", f"€{item['signal']['value_eur']:.2f}")
-                meta = st.columns(3)
-                meta[0].markdown(f"📨 **Channel**  \n{item['channel']}")
-                meta[1].markdown(f"⏰ **Moment**  \n{item['moment']}")
-                meta[2].markdown(f"🏦 **Service**  \n{item['service']}")
-                st.caption(f"🔔 Notification preview: “{item['notification']}”")
-                with st.expander("Why am I seeing this?"):
-                    st.write(item["signal"]["evidence"])
-                b1, b2 = st.columns(2)
-                b1.button("Interested", key=f"yes-{c['id']}-{item['signal']['type']}")
-                b2.button("Not for me", key=f"no-{c['id']}-{item['signal']['type']}")
+                st.markdown(f"#### {card['title']}")
+                st.write(card["message"])
+                with st.expander("More info"):
+                    st.write(card["more_info"])
+                cols = st.columns(2)
+                cols[0].button("I'm interested", key=f"y-{customer_id}-{card['service_id']}")
+                cols[1].button("Not for me", key=f"n-{customer_id}-{card['service_id']}")
+        with st.expander("Why am I seeing this?"):
+            for m in b["merchants"]:
+                st.write(f"{m['visits']}× at **{m['merchant']}** (€{m['spent']:.2f} in total)")
+        st.caption(f"Text written by: {u['method']}")
 
-with tab_scale:
-    st.subheader("Same engine, every customer")
-    st.write("Signals, moment and channel are simple rules → cheap to run nightly on millions of customers. "
-             "Only the final message is written by the LLM.")
+# --- Context Engine (the logic behind it) ---------------------------------------------
+with tab_engine:
+    st.markdown("#### 1. Transactions received")
+    st.dataframe(pd.DataFrame(state["transactions"]), hide_index=True, use_container_width=True)
+
+    st.markdown("#### 2. Merchant → industry classification (agent) + verification")
     rows = []
-    for cust in customers:
-        for o in sig.build_offers(cust, sig.detect_signals(cust, today), today):
-            rows.append({"customer": cust["name"], "age": cust["age"], "signal": o["signal"]["type"],
-                         "service": o["service"], "channel": o["channel"], "moment": o["moment"]})
-    st.dataframe(rows, hide_index=True, use_container_width=True)
+    for m, cl in sorted(state["classifications"].items()):
+        rows.append({"merchant": m, **{INDUSTRIES[k]["label"]: v for k, v in cl["scores"].items()},
+                     "status": "✅ verified" if cl["status"] == "verified" else "⚠️ needs review",
+                     "method": cl["method"], "reason": cl["reason"]})
+    st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+
+    st.markdown("#### 3. Industry score vs benchmark")
+    st.latex(r"\text{score} = \sum_{\text{merchants}} \frac{\text{relevance}}{10}\times\text{visits}^2"
+             r"\times\frac{\text{total spent}}{\text{avg. expense in industry}}")
+    for ind, b in state["breakdown"].items():
+        crossed = b["score"] >= b["benchmark"]
+        st.markdown(f"**{INDUSTRIES[ind]['label']}**: {b['score']} / benchmark {b['benchmark']} "
+                    + ("🟢 **triggered**" if crossed else "⚪ below benchmark"))
+        st.progress(min(1.0, b["score"] / b["benchmark"]))
+        if b["merchants"]:
+            st.dataframe(pd.DataFrame(b["merchants"]), hide_index=True, use_container_width=True)
+
+    history = db.get_score_history(customer_id)
+    if history:
+        st.markdown("#### 4. Living profile: score history")
+        df = pd.DataFrame(history)
+        df["run"] = df.groupby("industry").cumcount() + 1
+        st.line_chart(df.pivot(index="run", columns="industry", values="score"))
+
+# --- At scale --------------------------------------------------------------------------
+with tab_scale:
+    st.markdown(
+        "- **Merchants are classified once** and cached → cost grows with the number of *companies*, "
+        "not with 2.3M customers × transactions.\n"
+        "- **Scoring is a formula** (no LLM) → runs on every customer every night for almost nothing.\n"
+        "- **The LLM only writes** for customers who crossed a benchmark.\n"
+        "- **New industry** = one new entry in `config.py`."
+    )
+    classified = db.get_all_classifications()
     m = st.columns(3)
-    m[0].metric("Customers in demo", len(customers))
-    m[1].metric("Personal messages", len(rows))
-    m[2].metric("Channels used", len({r["channel"] for r in rows}))
+    m[0].metric("Customers", len(customers))
+    m[1].metric("Merchants classified (cache)", len(classified))
+    m[2].metric("Needing human review", sum(1 for x in classified if x["status"] != "verified"))

@@ -1,5 +1,15 @@
 # HANDOFF — Tectonic Hackathon (KBC challenge) · Team SLW Maaseik
 
+> **UPDATE (latest decisions, these override §3–§4 below):** the repo now implements the
+> **Context Engine** described in `README.md`:
+> - **LLM:** Google Gemini, via `langchain-google-genai` and `GOOGLE_API_KEY`.
+> - **3 industries** in `config.py`: travel, construction, baby & pregnancy.
+> - **Industry classification agent** (0–10 per industry, cached per merchant) + a **verification step** (rule check + Gemini judge, one retry, else `needs_review`).
+> - **Formula:** `score = Σ (relevance/10) × visits² × (total_spent / avg_expense)` (`scoring.py`).
+> - **Per-industry benchmark** → Gemini recommender writes the For You cards with "more info" → notification via the right channel (65+ → phone call) and moment (`signals.py`).
+> - **Pipeline:** `graph.py`. **Data:** `data/seed.json` → SQLite `kbc.db` (`db.py`). **UI:** `app.py`.
+> - Behavioural and context signals are listed as next steps.
+
 > **For Claude Code:** read this whole file before doing anything. It is the full context
 > of an earlier planning session. The team are **3 Python beginners** who just finished a
 > LangChain/LangGraph course. Explain what you do in plain language, define framework terms

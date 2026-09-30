@@ -10,3 +10,6 @@ __pycache__/
 .vscode/
 .idea/
 .DS_Store
+
+# Local demo database (rebuilt from data/seed.json)
+kbc.db

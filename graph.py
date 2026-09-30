@@ -1,93 +1,111 @@
-"""The "brain" of the app: a LangGraph graph that builds a personal For You feed.
+"""The Context Engine as a LangGraph pipeline (run once per customer, e.g. when new transactions arrive).
 
-    START --> detect_signals --> match_offers --> write_messages --> END
-              (rules)            (rules: service,   (LLM: personal text
-                                  moment, channel)   in the customer's language)
+ START → load_data → classify_merchants → verify_classification → score_industries
+                                                                        │
+                                   below every benchmark ──► END (nothing to show = no spam)
+                                   above a benchmark ↓
+                                recommend → notify → END
+
+- Node  = one step (a Python function that gets the state and returns what it changes).
+- Edge  = the arrow to the next step. A *conditional* edge picks the next step with a function.
+- State = the dictionary (EngineState) that travels through all nodes.
 """
-import os
 from typing import TypedDict
 
-from dotenv import load_dotenv
-from langchain.chat_models import init_chat_model
+import agents
+import db
+import scoring
+import signals
 from langgraph.graph import END, START, StateGraph
-from pydantic import BaseModel, Field
-
-import signals as sig
-
-load_dotenv()
-
-LANGUAGES = {"nl": "Dutch", "fr": "French", "en": "English"}
 
 
-class FeedState(TypedDict, total=False):
+class EngineState(TypedDict, total=False):
+    customer_id: str
     customer: dict
-    today: object  # datetime.date
-    signals: list[dict]
-    offers: list[dict]
-    feed: list[dict]
+    transactions: list[dict]
+    drafts: dict           # merchant -> classification before verification
+    classifications: dict  # merchant -> verified classification
+    breakdown: dict        # industry -> score details
+    triggered: list[str]   # industries above their benchmark
+    updates: list[dict]    # For You page content
+    notifications: list[dict]
 
 
-class Card(BaseModel):
-    """What the LLM must return for one offer (structured output)."""
-    title: str = Field(description="Short, catchy card title, max 6 words")
-    message: str = Field(description="2 sentences, personal, friendly, no jargon")
-    notification: str = Field(description="Push/email subject line, max 90 characters")
+def load_data(state: EngineState) -> dict:
+    return {"customer": db.get_customer(state["customer_id"]),
+            "transactions": db.get_transactions(state["customer_id"])}
 
 
-# --- Nodes ------------------------------------------------------------------
-def detect_signals(state: FeedState) -> dict:
-    return {"signals": sig.detect_signals(state["customer"], state["today"])}
+def classify_merchants(state: EngineState) -> dict:
+    """Agent step. Only NEW merchants are classified; known ones come from the cache table."""
+    llm = agents.get_llm()
+    drafts = {}
+    for t in state["transactions"]:
+        m = t["merchant"]
+        if m not in drafts and db.get_classification(m) is None:
+            drafts[m] = {**agents.classify_merchant(m, t["description"], llm), "description": t["description"]}
+    return {"drafts": drafts}
 
 
-def match_offers(state: FeedState) -> dict:
-    return {"offers": sig.build_offers(state["customer"], state["signals"], state["today"])}
+def verify_classification(state: EngineState) -> dict:
+    llm = agents.get_llm()
+    for m, draft in state["drafts"].items():
+        final = agents.verify(m, draft["description"], draft, llm)
+        db.save_classification(m, final["scores"], final["reason"], final["status"], final["method"])
+    merchants = {t["merchant"] for t in state["transactions"]}
+    return {"classifications": {m: db.get_classification(m) for m in merchants}}
 
 
-def _fallback_card(offer: dict) -> Card:
-    """Used when there is no API key or the LLM call fails, so the demo never breaks."""
-    return Card(title=offer["service"], message=offer["benefit"] + ".",
-                notification=f"{offer['service']}: {offer['benefit']}"[:90])
+def score_industries(state: EngineState) -> dict:
+    breakdown = scoring.industry_breakdown(state["transactions"], state["classifications"])
+    db.save_scores(state["customer_id"], {ind: b["score"] for ind, b in breakdown.items()})
+    return {"breakdown": breakdown, "triggered": scoring.above_benchmark(breakdown)}
 
 
-def write_messages(state: FeedState) -> dict:
+def route_after_scoring(state: EngineState) -> str:
+    return "recommend" if state["triggered"] else END
+
+
+def recommend(state: EngineState) -> dict:
+    llm = agents.get_llm()
+    updates = [{"industry": ind, **agents.recommend(state["customer"], ind, state["breakdown"][ind], llm)}
+               for ind in state["triggered"]]
+    db.replace_recommendations(state["customer_id"], updates)
+    return {"updates": updates}
+
+
+def notify(state: EngineState) -> dict:
+    """One notification per newly triggered industry — never twice for the same thing."""
     c = state["customer"]
-    feed = []
-    llm = None
-    if os.getenv("ANTHROPIC_API_KEY") or os.getenv("OPENAI_API_KEY"):
-        llm = init_chat_model(os.getenv("MODEL", "anthropic:claude-sonnet-5-5")).with_structured_output(Card)
-
-    for offer in state["offers"]:
-        card = None
-        if llm:
-            prompt = (
-                "You write personalised messages for the 'For You' page of KBC, a Belgian bank.\n"
-                f"Write in {LANGUAGES.get(c['language'], 'English')}. Channel: {offer['channel']}.\n"
-                "Adapt tone to the customer (age, occupation). Be helpful, not pushy. "
-                "Do not invent numbers other than the ones given.\n\n"
-                f"Customer: {c['name'].split()[0]}, {c['age']} years old, {c['occupation']}, lives in {c['city']}.\n"
-                f"What we noticed: {offer['signal']['evidence']}.\n"
-                f"KBC service to suggest: {offer['service']} — {offer['benefit']}.\n"
-                + (f"Estimated saving/value: €{offer['signal']['value_eur']}.\n" if offer["signal"].get("value_eur") else "")
-            )
-            try:
-                card = llm.invoke(prompt)
-            except Exception as e:  # network down, bad key, ... -> keep the demo alive
-                print(f"LLM failed, using fallback text: {e}")
-        feed.append({**offer, **(card or _fallback_card(offer)).model_dump()})
-    return {"feed": feed}
+    sent = []
+    for u in state["updates"]:
+        if not db.already_notified(c["id"], u["industry"]):
+            n = {"industry": u["industry"], "channel": signals.pick_channel(c),
+                 "moment": signals.pick_moment(c), "text": u["notification"]}
+            db.save_notification(c["id"], **n)
+            sent.append(n)
+    return {"notifications": sent}
 
 
-# --- Graph ------------------------------------------------------------------
 def build_graph():
-    builder = StateGraph(FeedState)
-    builder.add_node("detect_signals", detect_signals)
-    builder.add_node("match_offers", match_offers)
-    builder.add_node("write_messages", write_messages)
-    builder.add_edge(START, "detect_signals")
-    builder.add_edge("detect_signals", "match_offers")
-    builder.add_edge("match_offers", "write_messages")
-    builder.add_edge("write_messages", END)
-    return builder.compile()
+    g = StateGraph(EngineState)
+    for name, fn in [("load_data", load_data), ("classify_merchants", classify_merchants),
+                     ("verify_classification", verify_classification), ("score_industries", score_industries),
+                     ("recommend", recommend), ("notify", notify)]:
+        g.add_node(name, fn)
+    g.add_edge(START, "load_data")
+    g.add_edge("load_data", "classify_merchants")
+    g.add_edge("classify_merchants", "verify_classification")
+    g.add_edge("verify_classification", "score_industries")
+    g.add_conditional_edges("score_industries", route_after_scoring, ["recommend", END])
+    g.add_edge("recommend", "notify")
+    g.add_edge("notify", END)
+    return g.compile()
 
 
 graph = build_graph()
+
+
+def run(customer_id: str) -> EngineState:
+    db.ensure_db()
+    return graph.invoke({"customer_id": customer_id})

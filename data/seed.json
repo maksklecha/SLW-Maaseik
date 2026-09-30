@@ -1,0 +1,68 @@
+{
+  "note": "100% FAKE demo data. Never put real customer data in this repo. batch 0 = history, batch 1 = 'new transactions arrive' in the demo.",
+  "merchants": [
+    {"name": "Little Stars Childwear", "description": "Clothing shop for babies and children aged 0-8"},
+    {"name": "Prenatal Antwerpen", "description": "Maternity clothing and baby gear store"},
+    {"name": "Brussels Airlines", "description": "Airline, flights from Brussels Airport"},
+    {"name": "Booking.com", "description": "Online hotel booking platform"},
+    {"name": "Hotel Gracery Tokyo", "description": "Hotel in Tokyo, Japan"},
+    {"name": "Brico Liège", "description": "DIY and hardware store: tools, paint and building materials"},
+    {"name": "Carrelages Dupont", "description": "Tile shop for floor and wall tiles"},
+    {"name": "Colruyt", "description": "Supermarket"},
+    {"name": "Delhaize", "description": "Supermarket"},
+    {"name": "Spotify", "description": "Music streaming subscription"},
+    {"name": "Engie", "description": "Energy provider"}
+  ],
+  "customers": [
+    {
+      "id": "C001", "name": "Yusuf Demir", "age": 31, "gender": "M", "occupation": "Nurse (night shifts)",
+      "city": "Antwerpen", "language": "nl", "children": 0, "preferred_channel": "app", "active_hours": [15, 17],
+      "transactions": [
+        {"date": "2026-09-02", "merchant": "Colruyt", "amount_eur": 84.2, "batch": 0},
+        {"date": "2026-09-06", "merchant": "Little Stars Childwear", "amount_eur": 55.0, "batch": 0},
+        {"date": "2026-09-14", "merchant": "Engie", "amount_eur": 140.0, "batch": 0},
+        {"date": "2026-09-18", "merchant": "Little Stars Childwear", "amount_eur": 60.0, "batch": 1},
+        {"date": "2026-09-23", "merchant": "Little Stars Childwear", "amount_eur": 48.0, "batch": 1},
+        {"date": "2026-09-27", "merchant": "Prenatal Antwerpen", "amount_eur": 80.0, "batch": 1},
+        {"date": "2026-09-29", "merchant": "Little Stars Childwear", "amount_eur": 77.0, "batch": 1}
+      ]
+    },
+    {
+      "id": "C002", "name": "Lotte Peeters", "age": 27, "gender": "F", "occupation": "Software developer",
+      "city": "Gent", "language": "en", "children": 0, "preferred_channel": "app", "active_hours": [19, 22],
+      "transactions": [
+        {"date": "2026-09-01", "merchant": "Delhaize", "amount_eur": 62.5, "batch": 0},
+        {"date": "2026-09-03", "merchant": "Brussels Airlines", "amount_eur": 570.0, "batch": 0},
+        {"date": "2026-09-05", "merchant": "Spotify", "amount_eur": 11.99, "batch": 0},
+        {"date": "2026-09-12", "merchant": "Booking.com", "amount_eur": 310.0, "batch": 1},
+        {"date": "2026-09-15", "merchant": "Brussels Airlines", "amount_eur": 570.0, "batch": 1},
+        {"date": "2026-09-20", "merchant": "Booking.com", "amount_eur": 290.0, "batch": 1},
+        {"date": "2026-09-26", "merchant": "Hotel Gracery Tokyo", "amount_eur": 402.5, "batch": 1},
+        {"date": "2026-09-28", "merchant": "Booking.com", "amount_eur": 300.0, "batch": 1}
+      ]
+    },
+    {
+      "id": "C003", "name": "Marc Dubois", "age": 68, "gender": "M", "occupation": "Retired teacher, homeowner",
+      "city": "Liège", "language": "fr", "children": 2, "preferred_channel": "email", "active_hours": [9, 11],
+      "transactions": [
+        {"date": "2026-09-01", "merchant": "Delhaize", "amount_eur": 87.0, "batch": 0},
+        {"date": "2026-09-04", "merchant": "Brico Liège", "amount_eur": 90.0, "batch": 0},
+        {"date": "2026-09-20", "merchant": "Engie", "amount_eur": 160.0, "batch": 0},
+        {"date": "2026-09-10", "merchant": "Brico Liège", "amount_eur": 125.0, "batch": 1},
+        {"date": "2026-09-17", "merchant": "Carrelages Dupont", "amount_eur": 650.0, "batch": 1},
+        {"date": "2026-09-21", "merchant": "Brico Liège", "amount_eur": 110.0, "batch": 1},
+        {"date": "2026-09-27", "merchant": "Brico Liège", "amount_eur": 95.0, "batch": 1}
+      ]
+    },
+    {
+      "id": "C004", "name": "Emma Janssens", "age": 21, "gender": "F", "occupation": "Student",
+      "city": "Leuven", "language": "en", "children": 0, "preferred_channel": "app", "active_hours": [21, 23],
+      "transactions": [
+        {"date": "2026-09-03", "merchant": "Spotify", "amount_eur": 11.99, "batch": 0},
+        {"date": "2026-09-08", "merchant": "Delhaize", "amount_eur": 34.1, "batch": 0},
+        {"date": "2026-09-19", "merchant": "Little Stars Childwear", "amount_eur": 35.0, "batch": 1},
+        {"date": "2026-09-25", "merchant": "Colruyt", "amount_eur": 41.8, "batch": 1}
+      ]
+    }
+  ]
+}
