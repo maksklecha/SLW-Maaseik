@@ -77,8 +77,8 @@ This is the "no spam" rule. Because visits are **squared**, one purchase barely 
 These numbers are checked automatically in [test_scoring.py](test_scoring.py). Run it with `pytest`.
 
 ### What is tested, and what is not
-- ✅ **Unit tests** (`pytest`): 6 tests of the formulas and scenarios.
-- ✅ **`python verify_concept.py`**: 30 checks of every mechanism, including the Gemini code paths with a stub model (verification retry, output guardrails, no duplicate notifications, no repeated LLM calls).
+- ✅ **Unit tests** (`pytest`): 7 tests of the formulas and scenarios.
+- ✅ **`python verify_concept.py`**: 35 checks of every mechanism, including the Gemini code paths with a stub model (verification retry, output guardrails, no duplicate notifications, no repeated LLM calls).
 - ⚠️ **Not yet run against the live Gemini API.** The Gemini client is created and wired up, but real Gemini answers haven't been checked. With a key, the texts are written by Gemini instead of the templates in the saved example.
 - ⚠️ **Unfinished:** see the list below.
 
@@ -98,8 +98,8 @@ cp .env.example .env               # paste your free Gemini key (https://aistudi
 python check_setup.py              # tests the Gemini connection
 streamlit run app.py
 python example.py                  # one customer as a story in the terminal (no Streamlit)
-pytest                             # 6 unit tests of the scoring logic
-python verify_concept.py           # 30 automatic checks of every mechanism
+pytest                             # 7 unit tests of the scoring logic
+python verify_concept.py           # 35 automatic checks of every mechanism
 ```
 
 **Without a key, everything still runs:** a keyword classifier and template texts replace Gemini, and the app shows which method was used.

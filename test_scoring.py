@@ -69,3 +69,14 @@ def test_having_children_lowers_expecting_child_intent(fresh_db):
     assert no_kids >= 0.70
     assert with_kids["expecting_child"]["score"] == pytest.approx(no_kids * 0.5, abs=0.001)  # scores are rounded to 3 decimals
     assert not with_kids["expecting_child"]["validated"]
+
+
+def test_single_gift_never_triggers_even_with_app_views():
+    # Worst case: one gift purchase AND looked at child savings AND family insurance in the app
+    customer = {"children": 0, "monthly_income": 3000}
+    industries = scoring.industry_breakdown(
+        [{"merchant": "Little Stars Childwear", "amount_eur": 35}],
+        {"Little Stars Childwear": {"scores": {"baby_pregnancy": 9}}})
+    app_events = [{"event": "viewed_child_savings"}, {"event": "viewed_family_insurance"}]
+    s = scoring.intent_scores(customer, industries, [], app_events, [])
+    assert not s["expecting_child"]["validated"]

@@ -158,12 +158,12 @@ def verify(merchant: str, description: str, draft: dict, llm=None) -> dict:
 
 # --- 3. Advisor agent (For You page) -------------------------------------------------------
 def fallback_page(intents: list[str]) -> dict:
-    sections = [{"intent": i, "headline": INTENTS[i]["label"],
+    sections = [{"intent": i, "headline": INTENTS[i]["headline"],
                  "cards": [{"widget_id": w, "title": WIDGETS[w]["name"], "message": WIDGETS[w]["summary"],
                             "more_info": WIDGETS[w]["info"]} for w in INTENTS[i]["widgets"][:MAX_WIDGETS_PER_INTENT]]}
                 for i in intents]
-    topics = " & ".join(INTENTS[i]["label"].lower() for i in intents)
-    return {"sections": sections, "notification": f"Your For You page has an update: {topics}"[:120],
+    return {"sections": sections,
+            "notification": f"Your For You page has an update — {INTENTS[intents[0]]['headline']}"[:120],
             "method": "template fallback"}
 
 
@@ -176,6 +176,7 @@ def build_for_you_page(customer: dict, intents: list[str], scores: dict, industr
         ev = "; ".join(f"{e['signal']} ({e['detail']})" for e in scores[i]["evidence"] if e["strength"] > 0)
         widgets = "\n".join(f"    - {w}: {WIDGETS[w]['name']} — {WIDGETS[w]['info']}" for w in INTENTS[i]["widgets"])
         blocks.append(f"* intent={i} ({INTENTS[i]['label']}, {INTENTS[i]['type']}, score {scores[i]['score']:.0%})\n"
+                      f"  customer-facing headline style: '{INTENTS[i]['headline']}' (the internal label is NOT shown)\n"
                       f"  evidence: {ev}\n  available widgets:\n{widgets}")
     top_industry = max(industries, key=lambda k: industries[k]["score"])
     try:

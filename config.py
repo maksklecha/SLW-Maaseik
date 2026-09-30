@@ -52,6 +52,7 @@ INDUSTRIES = {
 INTENTS = {
     "international_travel": {
         "label": "International travel",
+        "headline": "Ready for your trip abroad?",   # what the CUSTOMER sees: soft, never states the guess
         "type": "Micro-moment",
         "signals": [
             {"kind": "industry", "industry": "travel", "weight": 0.80, "label": "Flight / hotel bookings"},
@@ -64,6 +65,7 @@ INTENTS = {
     },
     "expecting_child": {
         "label": "Expecting / planning a child",
+        "headline": "Planning for your family's future?",   # what the CUSTOMER sees: soft, never states the guess
         "type": "Life event",
         "signals": [
             {"kind": "industry", "industry": "baby_pregnancy", "weight": 0.85, "label": "Repeated baby & pregnancy purchases"},
@@ -79,6 +81,7 @@ INTENTS = {
     },
     "home_renovation": {
         "label": "Home renovation",
+        "headline": "Working on your home?",   # what the CUSTOMER sees: soft, never states the guess
         "type": "Life event",
         "signals": [
             {"kind": "industry", "industry": "construction", "weight": 0.85, "label": "Repeated DIY / building purchases"},
@@ -89,6 +92,7 @@ INTENTS = {
     },
     "budget_stress": {
         "label": "Budget stress",
+        "headline": "Keeping your month under control",   # what the CUSTOMER sees: soft, never states the guess
         "type": "Micro-moment",
         "signals": [
             {"kind": "app_event", "event": "balance_check_month_end", "min_count": 5, "weight": 0.65,

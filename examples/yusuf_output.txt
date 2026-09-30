@@ -41,10 +41,10 @@ AFTER — new data arrives (more childwear visits, maternity shop, app actions)
    Expecting / planning a child   94%  ✅ validated
 
 4) Notification: 📱 Push notification · Today between 15:00 and 17:00 (when they usually use their phone)
-   🔔 “Your For You page has an update: expecting / planning a child”
+   🔔 “Your For You page has an update — Planning for your family's future?”
 
 5) For You page:
-   ## Expecting / planning a child
+   ## Planning for your family's future?
    • KBC Kids Savings Account: Start saving for your child's future from day one.
      More info: A savings account in your child's name. Set up a small automatic monthly transfer; family can contribute too. Your child gets access at 18.
    • Family insurance update: Make sure your family insurance fits a growing family.

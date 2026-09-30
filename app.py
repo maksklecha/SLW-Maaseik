@@ -93,6 +93,10 @@ with tab_fyp:
                     draw_widget(card["widget_id"])
                     with st.expander("More info"):
                         st.write(card["more_info"])
+                    with st.expander("Why am I seeing this?"):
+                        for e in state["intents"][section["intent"]]["evidence"]:
+                            if e["strength"] > 0:
+                                st.write(f"• {e['signal']}: {e['detail']}")
                     cols = st.columns(2)
                     if cols[0].button("👍 Interested", key=f"y-{customer_id}-{card['widget_id']}"):
                         db.save_feedback(customer_id, card["widget_id"], "interested")
@@ -100,10 +104,6 @@ with tab_fyp:
                     if cols[1].button("Not for me", key=f"n-{customer_id}-{card['widget_id']}"):
                         db.save_feedback(customer_id, card["widget_id"], "not_for_me")
                         st.rerun()
-            with st.expander("Why am I seeing this?"):
-                for e in state["intents"][section["intent"]]["evidence"]:
-                    if e["strength"] > 0:
-                        st.write(f"• {e['signal']}: {e['detail']}")
         st.caption(f"Texts written by: {page['content']['method']}")
 
 # --- Context Engine: the logic behind it ------------------------------------------------------

@@ -104,6 +104,23 @@ check("Every merchant classified exactly once (cache) and verified",
       and all(c["status"] == "verified" for c in db.get_all_classifications()))
 
 
+# Responsible-by-design claims
+db.reset_db()
+db.release_next_batch("C001")
+y = graph.run("C001")
+customer_texts = " ".join([y["notification"]["text"]] + [s["headline"] for s in y["page"]["content"]["sections"]]).lower()
+check("Sensitive guess never stated in customer texts (no 'expecting', 'pregnant', 'baby')",
+      not any(w in customer_texts for w in ("expecting", "pregnan", "baby")), y["page"]["content"]["sections"][0]["headline"])
+app_src = open("app.py", encoding="utf-8").read()
+card_block = app_src.split("for card in section[\"cards\"]:")[1].split("st.caption(f\"Texts written by")[0]
+check("'Why am I seeing this?' is shown on every card", "Why am I seeing this?" in card_block)
+srcs = {f: open(f, encoding="utf-8").read() for f in ("scoring.py", "signals.py", "agents.py", "graph.py")}
+check("Gender is never read by the scoring, channel or agent code",
+      not any("[\"gender\"]" in s or "['gender']" in s for s in srcs.values()))
+check("Formula threshold: only intents >= 70% change the page",
+      all((v["score"] >= INTENT_THRESHOLD) == v["validated"] for v in y["intents"].values()))
+
+
 # ================================ B. Gemini code paths (stub) =====================================
 print("\n=== B. Agents with a stub Gemini model ===")
 
@@ -173,6 +190,30 @@ check("Advisor writes in the customer's language (Yusuf → Dutch, Marc → Fren
 before = len(stub.calls)
 graph.run("C002")
 check("Page refresh without new data makes NO new Gemini calls", len(stub.calls) == before)
+
+
+# ================================ D. Extending by configuration only ==============================
+print("\n=== D. New industry + intent + widget via config only ===")
+agents.get_llm = lambda: None
+import config  # noqa: E402
+config.INDUSTRIES["cars"] = {"label": "Cars", "description": "Car dealers and garages",
+                             "keywords": ["car", "garage", "dealer"], "avg_expense": 300, "benchmark": 30}
+config.WIDGETS["car_loan"] = {"type": "action", "action": "Simulate a car loan", "name": "KBC Car Loan",
+                              "summary": "Finance your new car.", "info": "A fixed-rate loan for a new or used car."}
+config.INTENTS["buying_car"] = {"label": "Buying a car", "headline": "Looking for a new car?", "type": "Life event",
+                                "signals": [{"kind": "industry", "industry": "cars", "weight": 0.8, "label": "Car dealer visits"}],
+                                "widgets": ["car_loan"]}
+db.reset_db()
+with db.connect() as conn:
+    conn.execute("INSERT INTO merchants VALUES ('Garage Peeters', 'Car dealer and garage')")
+    conn.executemany("INSERT INTO transactions (customer_id, ts, merchant, amount, currency, amount_eur, country, batch, released) "
+                     "VALUES ('C002', '2026-09-2' || ?, 'Garage Peeters', 400, 'EUR', 400, 'BE', 0, 1)", [(i,) for i in range(3)])
+car = graph.run("C002")
+check("New industry/intent/widget added only in config → classified, scored, validated, shown",
+      "buying_car" in car["validated"] and car["page"]["content"]["sections"][0]["cards"][0]["widget_id"] == "car_loan",
+      f"cars score {car['industries']['cars']['score']}, intent {car['intents']['buying_car']['score']:.0%}")
+for d, k in ((config.INDUSTRIES, "cars"), (config.WIDGETS, "car_loan"), (config.INTENTS, "buying_car")):
+    d.pop(k)
 
 
 # ================================ C. Real Gemini connection ========================================
