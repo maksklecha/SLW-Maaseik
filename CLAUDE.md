@@ -14,10 +14,14 @@ KBC is one of the largest banks in Belgium (banking, investment, insurance). Off
 
 **Team angle (from the KBC briefing):** time is more valuable than money; people work to have time available. So we look for a **common frustration that wastes customers' time**, adapt to the individual customer, and make it scale.
 
-Open decisions (fill in as the team decides):
-- Chosen frustration: TODO
-- Target customer / persona and signals used: TODO
-- One-sentence pitch: TODO (also goes in the `st.caption` in `app.py`)
+Decisions (made by the team):
+- **Chosen frustration:** customers have to search KBC Mobile's hundreds of features themselves, and banks contact them at the wrong moment through the wrong channel. That wastes their time.
+- **Solution:** *KBC For You*, a Context Engine that combines transactions, in-app behaviour and context (location, time) with the KBC profile into an Intent Score. Above the threshold it builds a personal For You page from modular widgets and notifies the customer at the right moment through the right channel.
+- **Personas and signals** (fake data in `database/seed.sql`):
+  - Yusuf, 31, no children, repeated childwear purchases → expecting a child
+  - Lotte, 27, flights + paying in yen + opening the app at Narita airport → international travel
+  - Marc, 68, DIY store visits + an unfinished loan simulator + balance checks → home renovation and budget stress, reached by phone call
+- **One-sentence pitch:** "KBC For You turns the KBC app from reactive to proactive: it recognises what is changing in your life and shows only what matters, at the right moment, through the right channel."
 
 ## Judging and submission (what we are scored on)
 Criteria: **Creativity** (original idea), **Technical ability** (does it work?), **Fit** (did we solve the challenge?), **Security** (Aikido audit = 10% of the assessment).
@@ -42,18 +46,26 @@ Aikido's AI Code Audit reasons about our logic. It looks for business-logic flaw
 Cursor, ElevenLabs (text to speech, could make a voice demo) and Google Cloud (credentials valid 1 week only) offer credits via Discord or Builderbase. Only use them if they help the demo.
 
 ## Tech stack and files
-Streamlit chat UI on top of a LangGraph graph. Python, run inside `.venv`.
+A LangGraph pipeline with Gemini agents, a SQLite database and a Streamlit demo. Python, run inside `.venv`. See `README.md` for the full design and `HANDOFF.md` for the planning history.
 
 | File | Role |
 |---|---|
-| `graph.py` | The "brain": LangGraph graph (state, nodes, edges) and `SYSTEM_PROMPT`. Most solution logic goes here. |
-| `app.py` | The Streamlit page the jury sees. Keep it simple and polished. |
-| `check_setup.py` | Verifies API key and model work. |
-| `.env` / `.env.example` | Secrets and `MODEL` (format `provider:model-name`). |
+| `database/schema.sql`, `database/seed.sql` | The SQL database and the 3 fake customers |
+| `config.py` | Industries, intents (signals + weights), widget library, thresholds |
+| `agents.py` | Gemini classification, verification and advisor agents (+ fallbacks, guardrails, model backup chain) |
+| `scoring.py` | Industry formula + Intent Score |
+| `signals.py` | Right channel + right moment rules |
+| `graph.py` | The LangGraph pipeline: Understand → Recognize → Adapt → notify |
+| `app.py` | The Streamlit demo the jury sees |
+| `example.py` | One-command terminal demo (Yusuf) |
+| `test_scoring.py`, `verify_concept.py` | Unit tests (pytest) and automatic checks of the whole concept |
+| `.env` / `.env.example` | `GOOGLE_API_KEY` and `MODEL` (format `provider:model-name`) |
 
-Commands (venv must be active: `source .venv/bin/activate`):
-- `python check_setup.py`: verify setup
+Commands (the venv must be active: `source .venv/bin/activate`):
+- `python check_setup.py`: verify the Gemini key and model
 - `streamlit run app.py`: run the demo
+- `python example.py`: terminal demo
+- `pytest` and `python verify_concept.py`: run all tests and checks
 - `pip install -r requirements.txt`: install dependencies (add new ones to this file)
 
 ## How Claude should work with us
@@ -72,13 +84,11 @@ Commands (venv must be active: `source .venv/bin/activate`):
 - Only commit or push when a teammate asks.
 - Use the default model unless told otherwise (`MODEL` in `.env`). Don't burn API credits on loops or huge prompts.
 
-## Preparation checklist
-- [ ] Everyone: clone, venv, `pip install`, `.env`, `python check_setup.py` prints "setup works!"
-- [ ] Everyone: `streamlit run app.py` opens locally
-- [ ] Pick the frustration, persona and pitch (fill in the TODOs above)
-- [ ] Split roles (e.g. prompt/graph logic, UI/demo, pitch/data) so people work in separate files
-- [ ] Rewrite `SYSTEM_PROMPT` in `graph.py` for the chosen problem
-- [ ] Plan the demo story: problem, personalised example, how it scales (3 min video)
-- [ ] Create Aikido account, connect repo, run baseline scan
-- [ ] Keep README up to date (what it is, how to run, what is unfinished)
-- [ ] Verify repo is public and links work before the final submission
+## Submission checklist
+- [x] Idea, personas and pitch decided (see "Decisions" above)
+- [x] Context Engine built, tested against live Gemini, 7 unit tests + 35 checks passing
+- [x] README up to date (what it is, how to run, walkthrough, what is unfinished)
+- [x] Repo is public; no keys or real data committed
+- [ ] Aikido: baseline scan, fix findings, re-scan, before/after screenshots
+- [ ] Demo video (< 3 min), link tested in an incognito window
+- [ ] Builderbase: description, repo link, video link, Aikido screenshots; submit at least 15 min early
