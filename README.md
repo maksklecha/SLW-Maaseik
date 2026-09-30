@@ -40,7 +40,7 @@ through the **right channel**.
 |---|---|---|---|---|
 | **Yusuf**, 31, nurse, **0 children** | 3 more childwear visits, a maternity store, looked at child savings | Expecting a child **94%** | 1-click kids' savings account, family insurance update, budget planner | 📱 Push, 15–17h |
 | **Lotte**, 27, developer | Hotel bookings, 2nd flight, **payments in JPY**, opened the app at **Narita airport** | International travel **98%** | Currency converter, unblock card worldwide, luggage micro-insurance | 📱 Push, **right now** |
-| **Marc**, 68, retired homeowner | 4× DIY store, tile shop, unfinished loan simulator, balance checks at month-end | Home renovation **93%** + budget stress **74%** | Renovation loan simulator, home insurance check, month overview, advisor call | 📞 **Phone call**, weekday 9–11h |
+| **Marc**, 68, retired homeowner | 4× DIY store, tile shop, unfinished loan simulator, balance checks at month-end | Home renovation **92%** + budget stress **74%** | Renovation loan simulator, home insurance check, month overview, advisor call | 📞 **Phone call**, weekday 9–11h |
 
 Before the new data arrives, all three are below the threshold, so they see the normal home screen with no message.
 
