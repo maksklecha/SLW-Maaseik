@@ -46,7 +46,7 @@ Aikido's AI Code Audit reasons about our logic. It looks for business-logic flaw
 Cursor, ElevenLabs (text to speech, could make a voice demo) and Google Cloud (credentials valid 1 week only) offer credits via Discord or Builderbase. Only use them if they help the demo.
 
 ## Tech stack and files
-A LangGraph pipeline with Gemini agents, a SQLite database and a Streamlit demo. Python, run inside `.venv`. See `README.md` for the full design and `HANDOFF.md` for the planning history.
+A LangGraph pipeline with Gemini agents, a SQLite database and a Streamlit demo. Python, run inside `.venv`. See `README.md` for the full design.
 
 | File | Role |
 |---|---|

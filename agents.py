@@ -17,6 +17,11 @@ from config import INDUSTRIES, INTENTS, MAX_RELEVANCE, MAX_WIDGETS_PER_INTENT, W
 
 load_dotenv()
 
+# Never send this app's prompts/data to an external tracing service (LangSmith), even if the
+# developer's shell has tracing switched on. Hard-set (not setdefault) so the shell can't override it.
+for _var in ("LANGSMITH_TRACING", "LANGSMITH_TRACING_V2", "LANGCHAIN_TRACING_V2", "LANGCHAIN_TRACING"):
+    os.environ[_var] = "false"
+
 DEFAULT_MODEL = "google_genai:gemini-3.1-flash-lite"   # fast; the backups take over when it is busy
 BACKUP_MODELS = ["google_genai:gemini-3.5-flash", "google_genai:gemini-3.8-flash"]
 LANGUAGES = {"nl": "Dutch", "fr": "French", "en": "English"}

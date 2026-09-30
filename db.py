@@ -17,8 +17,6 @@ DB_PATH = ROOT / "kbc.db"
 SCHEMA_FILE = ROOT / "database" / "schema.sql"
 SEED_FILE = ROOT / "database" / "seed.sql"
 
-EVENT_TABLES = ("transactions", "app_events", "context_events")  # fixed names, never user input
-
 
 def connect() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
@@ -79,26 +77,37 @@ def get_context_events(customer_id: str) -> list[dict]:
 def data_version(customer_id: str) -> int:
     """Number of received events. Changes only when new data arrives."""
     with connect() as conn:
-        return sum(conn.execute(f"SELECT COUNT(*) FROM {t} WHERE customer_id = ? AND released = 1",
-                                (customer_id,)).fetchone()[0] for t in EVENT_TABLES)
+        # One fixed query per table, with ? placeholders for every value.
+        return conn.execute(
+            "SELECT (SELECT COUNT(*) FROM transactions WHERE customer_id = ? AND released = 1)"
+            " + (SELECT COUNT(*) FROM app_events WHERE customer_id = ? AND released = 1)"
+            " + (SELECT COUNT(*) FROM context_events WHERE customer_id = ? AND released = 1)",
+            (customer_id,) * 3).fetchone()[0]
 
 
 def has_unreleased(customer_id: str) -> bool:
     with connect() as conn:
-        return any(conn.execute(f"SELECT 1 FROM {t} WHERE customer_id = ? AND released = 0",
-                                (customer_id,)).fetchone() for t in EVENT_TABLES)
+        return bool(conn.execute(
+            "SELECT EXISTS(SELECT 1 FROM transactions WHERE customer_id = ? AND released = 0)"
+            " OR EXISTS(SELECT 1 FROM app_events WHERE customer_id = ? AND released = 0)"
+            " OR EXISTS(SELECT 1 FROM context_events WHERE customer_id = ? AND released = 0)",
+            (customer_id,) * 3).fetchone()[0])
 
 
 def release_next_batch(customer_id: str) -> None:
     """Demo: simulate that new transactions / app actions / context signals arrive."""
     with connect() as conn:
-        batches = [conn.execute(f"SELECT MIN(batch) FROM {t} WHERE customer_id = ? AND released = 0",
-                                (customer_id,)).fetchone()[0] for t in EVENT_TABLES]
-        batches = [b for b in batches if b is not None]
-        if batches:
-            for t in EVENT_TABLES:
-                conn.execute(f"UPDATE {t} SET released = 1 WHERE customer_id = ? AND batch = ?",
-                             (customer_id, min(batches)))
+        next_batch = conn.execute(
+            "SELECT MIN(b) FROM ("
+            " SELECT MIN(batch) AS b FROM transactions WHERE customer_id = ? AND released = 0"
+            " UNION ALL SELECT MIN(batch) FROM app_events WHERE customer_id = ? AND released = 0"
+            " UNION ALL SELECT MIN(batch) FROM context_events WHERE customer_id = ? AND released = 0)",
+            (customer_id,) * 3).fetchone()[0]
+        if next_batch is not None:
+            args = (customer_id, next_batch)
+            conn.execute("UPDATE transactions SET released = 1 WHERE customer_id = ? AND batch = ?", args)
+            conn.execute("UPDATE app_events SET released = 1 WHERE customer_id = ? AND batch = ?", args)
+            conn.execute("UPDATE context_events SET released = 1 WHERE customer_id = ? AND batch = ?", args)
 
 
 # --- Classification cache -------------------------------------------------------------
