@@ -44,6 +44,44 @@ through the **right channel**.
 
 Before the new data arrives, all three are below the threshold, so they see the normal home screen with no message.
 
+## Walkthrough: Yusuf, before and after
+
+Run `python example.py` to see this in your terminal. No Streamlit or API key is needed.
+A saved run is in **[examples/yusuf_output.txt](examples/yusuf_output.txt)**. It was made without an API key, so it shows the keyword classifier and template texts.
+
+| Step | Before (history) | After "new data arrives" |
+|---|---|---|
+| Raw data | 3 transactions, incl. 1× Little Stars Childwear €55 | +3× Little Stars Childwear (€60, €48, €77), 1× Prenatal Antwerpen €80, looked at child savings + family insurance in the app |
+| Classification | Little Stars Childwear → Baby & pregnancy **9/10** ✅ verified | + Prenatal Antwerpen → Baby & pregnancy **10/10** ✅ verified |
+| Industry score (benchmark 50) | **1.24**, below | **88.4**, above |
+| Intent "expecting / planning a child" (threshold 70%) | **2%** | **94%** ✅ validated |
+| Notification + For You page | none, normal home screen | 📱 Push, today 15:00–17:00 → kids' savings account, family insurance update, family budget planner |
+
+### Worked example of the scoring formula (real numbers from the code)
+
+`score = Σ (relevance/10) × visits² × (total spent / average expense in the industry)`
+
+The average expense for Baby & pregnancy is **€40**, and the benchmark is **50** (both set in `config.py`).
+
+- **Yusuf, after:**
+  - Little Stars Childwear: 0.9 × 4² × (240 / 40) = 0.9 × 16 × 6 = **86.4**
+  - Prenatal Antwerpen: 1.0 × 1² × (80 / 40) = 1.0 × 1 × 2 = **2.0**
+  - Total: **88.4 ≥ 50**, so the transactional signal is at full strength.
+- **Yusuf, before:** 0.9 × 1² × (55 / 40) = **1.24**, far below 50.
+- **Emma (one gift):** one childwear purchase of €35, bought as a present: 0.9 × 1² × (35 / 40) = **0.79**, far below 50.
+
+This is the "no spam" rule. Because visits are **squared**, one purchase barely counts and **repeated** visits add up very fast. A single gift never triggers a message.
+
+**The Intent Score** then combines this with the other signals: `1 − (1 − 0.85×1.0) × (1 − 0.40×1) × (1 − 0.30×1) = 1 − 0.15 × 0.6 × 0.7 = 93.7%`. The three factors are the purchases, the child savings page and the family insurance page. If Yusuf already had children, the score would be halved to 47%, below the threshold.
+
+These numbers are checked automatically in [test_scoring.py](test_scoring.py). Run it with `pytest`.
+
+### What is tested, and what is not
+- ✅ **Unit tests** (`pytest`): 6 tests of the formulas and scenarios.
+- ✅ **`python verify_concept.py`**: 30 checks of every mechanism, including the Gemini code paths with a stub model (verification retry, output guardrails, no duplicate notifications, no repeated LLM calls).
+- ⚠️ **Not yet run against the live Gemini API.** The Gemini client is created and wired up, but real Gemini answers haven't been checked. With a key, the texts are written by Gemini instead of the templates in the saved example.
+- ⚠️ **Unfinished:** see the list below.
+
 ### Why it scales to 2.3M customers
 - Companies are classified once; there are far fewer companies than customers × transactions.
 - Both scores are formulas (no LLM), cheap enough to run every night for every customer.
@@ -59,6 +97,8 @@ pip install -r requirements.txt
 cp .env.example .env               # paste your free Gemini key (https://aistudio.google.com → Get API key)
 python check_setup.py              # tests the Gemini connection
 streamlit run app.py
+python example.py                  # one customer as a story in the terminal (no Streamlit)
+pytest                             # 6 unit tests of the scoring logic
 python verify_concept.py           # 30 automatic checks of every mechanism
 ```
 
@@ -82,6 +122,9 @@ Anyone with the link then uses Gemini. **Never commit a key to this repo.**
 | `graph.py` | The LangGraph pipeline |
 | `app.py` | Streamlit demo: For You page, Context Engine view, At scale |
 | `verify_concept.py` | Automatic checks of the whole concept |
+| `example.py` | One-command demo for one customer, printed as a story |
+| `examples/yusuf_output.txt` | Saved output of `example.py` (no API key) |
+| `test_scoring.py` | Unit tests (pytest) |
 
 ## Unfinished / next steps
 - Real KBC data, products and tariffs (everything here, including the rates, is illustrative).

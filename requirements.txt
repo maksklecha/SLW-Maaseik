@@ -6,3 +6,4 @@ streamlit
 python-dotenv
 pandas
 langchain-google-genai
+pytest

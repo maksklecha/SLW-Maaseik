@@ -1,0 +1,54 @@
+LLM: no API key → keyword classifier + template texts
+
+======================================================================
+BEFORE — Yusuf's history (one visit to a childwear shop)
+======================================================================
+👤 Yusuf Demir, 31, Nurse (night shifts), 0 children, prefers app
+📥 Data received: 3 transactions, 0 app actions, 0 context signals
+
+1) Classification agent (+ verification):
+   Colruyt                  no relevant industry  [verified, keyword fallback]
+   Engie                    no relevant industry  [verified, keyword fallback]
+   Little Stars Childwear   {'Baby & pregnancy': 9}  [verified, keyword fallback]
+
+2) Industry score vs benchmark (team formula):
+   Baby & pregnancy: 0.9×1²×(55/40) = 1.24  (benchmark 50)
+
+3) Intent Scores (threshold 70%):
+   Expecting / planning a child   2%  ⚪ below threshold
+
+4) Notification: none — nothing important to tell (no spam)
+
+5) For You page:
+   the normal KBC home screen
+
+======================================================================
+AFTER — new data arrives (more childwear visits, maternity shop, app actions)
+======================================================================
+👤 Yusuf Demir, 31, Nurse (night shifts), 0 children, prefers app
+📥 Data received: 7 transactions, 2 app actions, 0 context signals
+
+1) Classification agent (+ verification):
+   Colruyt                  no relevant industry  [verified, keyword fallback]
+   Engie                    no relevant industry  [verified, keyword fallback]
+   Little Stars Childwear   {'Baby & pregnancy': 9}  [verified, keyword fallback]
+   Prenatal Antwerpen       {'Baby & pregnancy': 10}  [verified, keyword fallback]
+
+2) Industry score vs benchmark (team formula):
+   Baby & pregnancy: 0.9×4²×(240/40) + 1.0×1²×(80/40) = 88.4  (benchmark 50)
+
+3) Intent Scores (threshold 70%):
+   Expecting / planning a child   94%  ✅ validated
+
+4) Notification: 📱 Push notification · Today between 15:00 and 17:00 (when they usually use their phone)
+   🔔 “Your For You page has an update: expecting / planning a child”
+
+5) For You page:
+   ## Expecting / planning a child
+   • KBC Kids Savings Account: Start saving for your child's future from day one.
+     More info: A savings account in your child's name. Set up a small automatic monthly transfer; family can contribute too. Your child gets access at 18.
+   • Family insurance update: Make sure your family insurance fits a growing family.
+     More info: Family (civil liability) insurance covers damage caused to others by members of your family. Add a new family member in the app, without paperwork.
+   • Family budget planner: See what a growing family means for your budget.
+     More info: Estimate new monthly costs such as childcare, clothing and health, and how much you can save.
+   (texts written by: template fallback)
