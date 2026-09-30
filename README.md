@@ -1,40 +1,49 @@
-# SLW-Maaseik
-Gezamenlijke repository voor Tectonic Hackathon ronde 1 - SLW Maaseik
+# KBC For You — SLW Maaseik
+Tectonic Hackathon ronde 1 · KBC challenge
 
-Starter kit: a **Streamlit** chat UI on top of a **LangGraph** graph.
+**Time is worth more than money.** Customers don't want to hunt for the right bank product:
+KBC should notice what's going on in their life and offer the right help,
+**at the right moment, through the right channel**.
 
-| File | What it is |
-|---|---|
-| `graph.py` | The "brain": the LangGraph graph (nodes + edges). Change the system prompt / add nodes here. |
-| `app.py` | The demo web page the jury sees (Streamlit). |
-| `check_setup.py` | Tests that your API key + model work. |
-| `.env.example` | Template for your secrets. Copy to `.env`. |
+**KBC For You** is a personalised feed + notification engine:
 
-## Setup (every team member, once)
+1. **Signals** from (fake) customer data: profile (age, gender, occupation, language) + transactions.
+   Example: Lotte (27) is paying in **JPY** in Tokyo → foreign-currency fees.
+2. **Offer matching**: each signal maps to a KBC service (e.g. *Travel & FX advice*).
+3. **Right moment & channel**: based on the profile. Lotte is abroad and uses the app → push
+   notification tonight during her usual active hours. Marc (68) → email / advisor call.
+4. **Personal message**: an LLM writes the card in the customer's own language and tone.
+
+```
+START → detect_signals → match_offers → write_messages → END
+        (rules)          (rules)         (LLM, with fallback text)
+```
+
+**Why it scales to 2.3M customers:** steps 1–3 are cheap rules that can run nightly on every
+customer; the LLM is only used for the final wording, and the demo still works without it.
+
+## Run it
 
 ```bash
-git clone https://github.com/maksklecha/SLW-Maaseik.git
-cd SLW-Maaseik
 python3 -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env               # then open .env and paste your API key
-python check_setup.py              # should print "setup works!"
-streamlit run app.py               # opens the app in your browser
+cp .env.example .env               # optional: add an API key for LLM-written messages
+streamlit run app.py
 ```
 
-> Every time you open a new terminal, run `source .venv/bin/activate` again.
+| File | What it is |
+|---|---|
+| `data/customers.json` | 5 **fake** customers (profile + transactions) |
+| `signals.py` | Rules: signals, KBC service catalogue, moment & channel |
+| `graph.py` | LangGraph pipeline + LLM message writer |
+| `app.py` | Streamlit demo: For You page + "At scale" view |
 
-## Git workflow during the hackathon
+## Unfinished / next steps
+- Real KBC data & product catalogue (fees and services here are illustrative).
+- Learn from "Interested / Not for me" clicks to improve ranking.
+- Real delivery via push/email/voice (e.g. ElevenLabs for a voice channel).
+- Authentication: the demo lets you pick any fake customer; a real app would only show the logged-in customer's own feed.
 
-```bash
-git pull                     # before you start working
-git add <files>              # stage your changes
-git commit -m "what you did"
-git pull                     # get teammates' work
-git push
-```
-
-- Pull and push **often** (every 20–30 min).
-- Try to work in **different files** to avoid merge conflicts.
-- **Never commit `.env`** (it's already in `.gitignore`).
+## Security
+No real customer data, no secrets in the repo (`.env` is git-ignored), LLM output is rendered as plain text.

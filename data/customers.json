@@ -1,0 +1,108 @@
+{
+  "as_of": "2026-09-30",
+  "note": "100% FAKE demo data. Never put real customer data in this repo.",
+  "customers": [
+    {
+      "id": "C001",
+      "name": "Lotte Peeters",
+      "age": 27,
+      "gender": "F",
+      "occupation": "Software developer",
+      "city": "Gent",
+      "language": "nl",
+      "preferred_channel": "app",
+      "active_hours": [19, 22],
+      "balance_eur": 3200,
+      "monthly_expenses_eur": 1900,
+      "location_now": "JP",
+      "transactions": [
+        {"date": "2026-09-02", "merchant": "Brussels Airlines", "category": "travel", "amount": 1140, "currency": "EUR", "amount_eur": 1140, "country": "BE"},
+        {"date": "2026-09-26", "merchant": "Lawson Shibuya", "category": "groceries", "amount": 2400, "currency": "JPY", "amount_eur": 15.1, "country": "JP"},
+        {"date": "2026-09-27", "merchant": "JR East", "category": "transport", "amount": 29650, "currency": "JPY", "amount_eur": 186.4, "country": "JP"},
+        {"date": "2026-09-28", "merchant": "Ichiran Ramen", "category": "restaurant", "amount": 3900, "currency": "JPY", "amount_eur": 24.5, "country": "JP"},
+        {"date": "2026-09-29", "merchant": "Uniqlo Ginza", "category": "shopping", "amount": 18700, "currency": "JPY", "amount_eur": 117.6, "country": "JP"},
+        {"date": "2026-09-29", "merchant": "Hotel Gracery", "category": "travel", "amount": 64000, "currency": "JPY", "amount_eur": 402.5, "country": "JP"}
+      ]
+    },
+    {
+      "id": "C002",
+      "name": "Marc Dubois",
+      "age": 68,
+      "gender": "M",
+      "occupation": "Retired teacher",
+      "city": "Liège",
+      "language": "fr",
+      "preferred_channel": "email",
+      "active_hours": [9, 11],
+      "balance_eur": 48500,
+      "monthly_expenses_eur": 2100,
+      "location_now": "BE",
+      "transactions": [
+        {"date": "2026-09-01", "merchant": "Federale Pensioendienst", "category": "pension", "amount": 2450, "currency": "EUR", "amount_eur": 2450, "country": "BE"},
+        {"date": "2026-09-05", "merchant": "Delhaize", "category": "groceries", "amount": 87, "currency": "EUR", "amount_eur": 87, "country": "BE"},
+        {"date": "2026-09-12", "merchant": "Pharmacie Centrale", "category": "health", "amount": 34, "currency": "EUR", "amount_eur": 34, "country": "BE"},
+        {"date": "2026-09-20", "merchant": "Engie", "category": "utilities", "amount": 160, "currency": "EUR", "amount_eur": 160, "country": "BE"}
+      ]
+    },
+    {
+      "id": "C003",
+      "name": "Yusuf Demir",
+      "age": 34,
+      "gender": "M",
+      "occupation": "Nurse (night shifts)",
+      "city": "Antwerpen",
+      "language": "nl",
+      "preferred_channel": "app",
+      "active_hours": [15, 17],
+      "balance_eur": 5400,
+      "monthly_expenses_eur": 2600,
+      "location_now": "BE",
+      "transactions": [
+        {"date": "2026-09-03", "merchant": "Dreambaby", "category": "baby", "amount": 389, "currency": "EUR", "amount_eur": 389, "country": "BE"},
+        {"date": "2026-09-10", "merchant": "Kruidvat", "category": "baby", "amount": 42, "currency": "EUR", "amount_eur": 42, "country": "BE"},
+        {"date": "2026-09-18", "merchant": "Prenatal", "category": "baby", "amount": 215, "currency": "EUR", "amount_eur": 215, "country": "BE"},
+        {"date": "2026-09-22", "merchant": "Colruyt", "category": "groceries", "amount": 96, "currency": "EUR", "amount_eur": 96, "country": "BE"}
+      ]
+    },
+    {
+      "id": "C004",
+      "name": "Emma Janssens",
+      "age": 21,
+      "gender": "F",
+      "occupation": "Student (part-time job)",
+      "city": "Leuven",
+      "language": "en",
+      "preferred_channel": "app",
+      "active_hours": [21, 23],
+      "balance_eur": 740,
+      "monthly_expenses_eur": 650,
+      "location_now": "BE",
+      "transactions": [
+        {"date": "2026-09-25", "merchant": "Delhaize (salary)", "category": "salary", "amount": 820, "currency": "EUR", "amount_eur": 820, "country": "BE", "first_time": true},
+        {"date": "2026-09-01", "merchant": "Netflix", "category": "subscription", "amount": 13.99, "currency": "EUR", "amount_eur": 13.99, "country": "BE"},
+        {"date": "2026-09-03", "merchant": "Spotify", "category": "subscription", "amount": 11.99, "currency": "EUR", "amount_eur": 11.99, "country": "BE"},
+        {"date": "2026-09-05", "merchant": "Disney+", "category": "subscription", "amount": 10.99, "currency": "EUR", "amount_eur": 10.99, "country": "BE"},
+        {"date": "2026-09-08", "merchant": "Basic-Fit", "category": "subscription", "amount": 29.99, "currency": "EUR", "amount_eur": 29.99, "country": "BE"},
+        {"date": "2026-09-14", "merchant": "Amazon Prime", "category": "subscription", "amount": 6.99, "currency": "EUR", "amount_eur": 6.99, "country": "BE"}
+      ]
+    },
+    {
+      "id": "C005",
+      "name": "Sofie Claes",
+      "age": 45,
+      "gender": "F",
+      "occupation": "Freelance architect",
+      "city": "Hasselt",
+      "language": "nl",
+      "preferred_channel": "email",
+      "active_hours": [7, 8],
+      "balance_eur": 12800,
+      "monthly_expenses_eur": 3400,
+      "location_now": "BE",
+      "transactions": [
+        {"date": "2026-09-21", "merchant": "Delta Air Lines", "category": "travel", "amount": 2380, "currency": "EUR", "amount_eur": 2380, "country": "US", "trip_start": "2026-10-14", "destination": "US"},
+        {"date": "2026-09-23", "merchant": "Booking.com New York", "category": "travel", "amount": 1450, "currency": "USD", "amount_eur": 1305, "country": "US"}
+      ]
+    }
+  ]
+}
